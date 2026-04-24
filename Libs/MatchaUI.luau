@@ -1,4 +1,4 @@
-print("MatchaUI v1.0.0 | Sailor Piece Menu v1.0.0 — B10X")
+print("MatchaUI v1.0.0 | Sailor Piece Menu v1.0.0 - B10X")
 local MatchaUI = {}
 MatchaUI.__index = MatchaUI
 
