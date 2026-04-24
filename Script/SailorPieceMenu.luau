@@ -1,7 +1,7 @@
 
-- Sailor Piece, by Saint_B10X
+-- Sailor Piece, by Saint_B10X
 
-- Loader
+-- Loader
 local loaderSource = game:HttpGet("https://raw.githubusercontent.com/b10xy-menu/Matcha/refs/heads/main/Libs/Loader.luau")
 local fn, loaderErr = loadstring("MatchaLib = (function()\n" .. loaderSource .. "\nend)()")
 if not fn then error("COMPILE ERROR (Loader): " .. tostring(loaderErr)) end
@@ -9,7 +9,7 @@ fn()
 local Loader = MatchaLib
 local UiLib = Loader.load("MatchaUI")
 
-- Keycodes
+-- Keycodes
 local keyMap = {
 	A = 65, B = 66, C = 67, D = 68, E = 69, F = 70,
 	G = 71, H = 72, I = 73, J = 74, K = 75, L = 76,
@@ -79,7 +79,7 @@ local farmToggles = {
 	equipTools = false,
 }
 
-- Helpers
+-- Helpers
 local function getRoot(Model)
 	if not Model.ClassName == "Model" then return "Class missmatch" end
 	local Root = Model:FindFirstChild("HumanoidRootPart")
@@ -96,7 +96,7 @@ local function getHumanoid(Model)
 	return Humanoid
 end
 
-- Tool Utilities
+-- Tool Utilities
 local function refreshTools()
 	table.clear(farmCfg.Tools)
 	table.insert(farmCfg.Tools, "None")
@@ -153,7 +153,7 @@ local function equipTool(toolName)
 	return "Tool not found"
 end
 
-- NPCs Utilities
+-- NPCs Utilities
 local function refreshNPCs()
 	table.clear(farmCfg.SelectedNPCs)
 	table.clear(farmCfg.ExistingNPCs)
@@ -250,7 +250,7 @@ local function findNearestNPC(filterNames)
 	return nearestNPC
 end
 
-- Utilities 
+-- Utilities 
 local tweenToken = 0
 local function TweenTo(targetPos, lift)
 	tweenToken += 1
@@ -375,7 +375,7 @@ local function getNearestSpawnpoint()
 	return nearestSpawnpoint
 end
 
-- Auto Farm Logic 
+-- Auto Farm Logic 
 local function getSpawnpointAddress(spawnpoint)
 	if not spawnpoint then return nil end
 	return tostring(spawnpoint.Address)
@@ -409,7 +409,7 @@ local function handleSpawnpoint()
 	return true
 end
 
-- Farm Utilities 
+-- Farm Utilities 
 local function attackNPC(npc)
 	if not farmToggles.farming then return end
 
@@ -547,9 +547,9 @@ local function startAutoFarm(state)
 	end)
 end
 
-- UI INIT
+-- UI INIT
 local Window = UiLib.CreateWindow({
-	Title  = "Sailor Piece Menu v1.0.0 — B10X",
+	Title  = "Sailor Piece Menu v1.0.0 - B10X",
 	X      = 510,
 	Y      = 110,
 	Width  = 615,
@@ -557,13 +557,13 @@ local Window = UiLib.CreateWindow({
 	ZIndex = 110,
 })
 
-- Categories 
+-- Categories 
 local catSetup = Window.AddCategory("Auto Farm Settings")
 local catFarm = Window.AddCategory("Auto Farm")
 
-- Setup Category
+-- Setup Category
 
-- Tools section
+-- Tools section
 Window.AddSection(catSetup, "Tools")
 local toolsDd = Window.AddDropdown(catSetup, "Tool select", farmCfg.Tools, "None", function(sel)
 	task.spawn(function()
@@ -594,7 +594,7 @@ local toolUpdtateBtn = Window.AddButton(catSetup, "Refresh tools", function()
 end)
 Window.AddTooltip(toolUpdtateBtn, "Update the list of tools.")
 
-- NPCs Section 
+-- NPCs Section 
 Window.AddSection(catSetup, "NPCs")
 local NPCsLabel = Window.AddValueLabel(catSetup, "Selected NPCs", "None")
 local NPCsDd = Window.AddDropdown(catSetup, "Select NPCs", farmCfg.ExistingNPCs, "None", function(sel)
@@ -627,7 +627,7 @@ Window.AddSlider(catSetup, "NPC Distance", 1, 20, farmCfg.NPCDistance, function(
 	farmCfg.NPCDistance = math.floor(val)
 end)
 
-- Farm Section 
+-- Farm Section 
 Window.AddSection(catSetup, "Farm")
 
 local farmMethodDd = Window.AddDropdown(catSetup, "Farm method", {"Nearest", "Selected", "Quest", "LevelUp"}, farmCfg.AutofarmMethod, function(sel)
@@ -644,7 +644,7 @@ local selectQuestDd = Window.AddDropdown(catSetup, "Quest (for Quest method)", f
 	end)
 end)
 
-- Farm Category 
+-- Farm Category 
 Window.AddToggle(catFarm, "Auto Farm", farmToggles.farming, function(state)
 	task.spawn(function()
 		startAutoFarm(state)
