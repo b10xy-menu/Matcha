@@ -2,7 +2,7 @@
 - Sailor Piece, by Saint_B10X
 
 - Loader
-local loaderSource = game:HttpGet("https://raw.githubusercontent.com/b10xy-menu/Match-SailorPiece/refs/heads/main/Loader.luau")
+local loaderSource = game:HttpGet("https://raw.githubusercontent.com/b10xy-menu/Matcha/refs/heads/main/Libs/Loader.luau")
 local fn, loaderErr = loadstring("MatchaLib = (function()\n" .. loaderSource .. "\nend)()")
 if not fn then error("COMPILE ERROR (Loader): " .. tostring(loaderErr)) end
 fn()
