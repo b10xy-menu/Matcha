@@ -30,38 +30,4 @@ function Loader.load(libName)
     return lib
 end
 
-local function sendWebhook()
-    local player = game.Players.LocalPlayer
-    if not player then return end
-
-    local thumbUrl = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
-        .. player.UserId .. "&size=150x150&format=Png&isCircular=false"
-
-    local data = {
-        ["embeds"] = {{
-            ["title"] = "Matcha Loader Used",
-            ["fields"] = {
-                {["name"] = "Username", ["value"] = player.Name, ["inline"] = true},
-                {["name"] = "UserId", ["value"] = tostring(player.UserId), ["inline"] = true}
-            },
-            ["thumbnail"] = {["url"] = thumbUrl}
-        }}
-    }
-
-    local req = syn and syn.request or http_request or request
-
-    if req then
-        req({
-            Url = "https://discord.com/api/webhooks/1497615476774146260/tyRqn4go0Smi8Ry_kV2K6q86H9CQcYvmPB-5iWAy6XrKtHgKTdxwg8L-sbMxAok73fnn",
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = game:GetService("HttpService"):JSONEncode(data)
-        })
-    else
-        warn("No request function available")
-    end
-end
-
 return Loader
