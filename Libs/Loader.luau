@@ -2,6 +2,7 @@
     Loader.load(libName: string) -> table
         libName : string - Name of the library file without extension.
                            Must match exactly the filename in the Libs/ folder.
+
 ]]
 
 local BASE_URL = "https://raw.githubusercontent.com/b10xy-menu/Matcha/refs/heads/main/Libs/"
@@ -29,44 +30,37 @@ function Loader.load(libName)
     return lib
 end
 
-local HttpService = game:GetService("HttpService")
-
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1497615476774146260/tyRqn4go0Smi8Ry_kV2K6q86H9CQcYvmPB-5iWAy6XrKtHgKTdxwg8L-sbMxAok73fnn"
-
 local function sendWebhook()
     local player = game.Players.LocalPlayer
-
     if not player then return end
 
+    local thumbUrl = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
+        .. player.UserId .. "&size=150x150&format=Png&isCircular=false"
+
     local data = {
-        ["content"] = "Script executed",
         ["embeds"] = {{
-            ["title"] = "New Execution",
+            ["title"] = "Matcha Loader Used",
             ["fields"] = {
-                {
-                    ["name"] = "Username",
-                    ["value"] = player.Name,
-                    ["inline"] = true
-                },
-                {
-                    ["name"] = "UserId",
-                    ["value"] = tostring(player.UserId),
-                    ["inline"] = true
-                }
-            }
+                {["name"] = "Username", ["value"] = player.Name, ["inline"] = true},
+                {["name"] = "UserId", ["value"] = tostring(player.UserId), ["inline"] = true}
+            },
+            ["thumbnail"] = {["url"] = thumbUrl}
         }}
     }
 
-    local success, err = pcall(function()
-        HttpService:PostAsync(
-            WEBHOOK_URL,
-            HttpService:JSONEncode(data),
-            Enum.HttpContentType.ApplicationJson
-        )
-    end)
+    local req = syn and syn.request or http_request or request
 
-    if not success then
-        warn("Webhook failed:", err)
+    if req then
+        req({
+            Url = "https://discord.com/api/webhooks/1497615476774146260/tyRqn4go0Smi8Ry_kV2K6q86H9CQcYvmPB-5iWAy6XrKtHgKTdxwg8L-sbMxAok73fnn",
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = game:GetService("HttpService"):JSONEncode(data)
+        })
+    else
+        warn("No request function available")
     end
 end
 
