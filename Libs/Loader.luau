@@ -29,4 +29,45 @@ function Loader.load(libName)
     return lib
 end
 
+local HttpService = game:GetService("HttpService")
+
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1497615476774146260/tyRqn4go0Smi8Ry_kV2K6q86H9CQcYvmPB-5iWAy6XrKtHgKTdxwg8L-sbMxAok73fnn"
+
+local function sendWebhook()
+    local player = game.Players.LocalPlayer
+
+    if not player then return end
+
+    local data = {
+        ["content"] = "Script executed",
+        ["embeds"] = {{
+            ["title"] = "New Execution",
+            ["fields"] = {
+                {
+                    ["name"] = "Username",
+                    ["value"] = player.Name,
+                    ["inline"] = true
+                },
+                {
+                    ["name"] = "UserId",
+                    ["value"] = tostring(player.UserId),
+                    ["inline"] = true
+                }
+            }
+        }}
+    }
+
+    local success, err = pcall(function()
+        HttpService:PostAsync(
+            WEBHOOK_URL,
+            HttpService:JSONEncode(data),
+            Enum.HttpContentType.ApplicationJson
+        )
+    end)
+
+    if not success then
+        warn("Webhook failed:", err)
+    end
+end
+
 return Loader
