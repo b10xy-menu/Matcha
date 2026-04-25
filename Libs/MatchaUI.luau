@@ -42,17 +42,14 @@ local Theme = {
     SectionText     = AccentColor,
 }
 
--- ─────────────────────────────────────────────────────────────
+
 -- INTERNAL HELPERS
--- ─────────────────────────────────────────────────────────────
+
 local _objects  = {}   -- all Drawing objects for cleanup
 local _windows  = {}   -- registered windows
 local _notifs   = {}   -- active notifications
 local _tooltips = {}   -- active tooltips
 
--- Set to true while any dropdown is open.
--- While Choosing is true, checkboxes, toggles, textboxes, and other interactive
--- elements will not respond to input so the dropdown has exclusive focus.
 MatchaUI.Choosing = false
 
 local function newDraw(type)
@@ -74,9 +71,7 @@ local function makeRect(x, y, w, h, color, zIndex, filled, thickness)
     return r
 end
 
--- Active font — changed globally via MatchaUI.SetFont()
 local _currentFont = Drawing.Fonts.Monospace
--- All Text Drawing objects created by makeText, so SetFont can repaint them
 local _textObjects = {}
 
 local function makeText(text, x, y, size, color, zIndex, centered, outline)
@@ -107,9 +102,9 @@ local function setGroupVisible(group, state)
     end
 end
 
--- ─────────────────────────────────────────────────────────────
+
 -- INPUT STATE
--- ─────────────────────────────────────────────────────────────
+
 local Mouse        = game:GetService("Players").LocalPlayer:GetMouse()
 local _lastMouse1  = false
 local _mouseJustDown  = false
@@ -142,9 +137,6 @@ local MouseVKCodes = {
     [6]=true,   -- VK_XBUTTON2
 }
 
--- Explicit allowlist of VK codes that are valid keybind targets.
--- Only keyboard keys with readable names are accepted; mouse buttons and
--- unmappable codes (3, 7, 0xA–0x0F, etc.) are silently skipped.
 local VALID_KEYBIND_KEYS = {
     -- Special
     [8]=true,  [9]=true,  [13]=true, [16]=true, [17]=true,
@@ -168,23 +160,17 @@ local VALID_KEYBIND_KEYS = {
     [122]=true,[123]=true,
 }
 
--- ─────────────────────────────────────────────────────────────
+
 -- ACCENT COLOR REGISTRY
--- ─────────────────────────────────────────────────────────────
--- Must be declared before CreateWindow so element builder closures
--- can call trackAccent(). SetAccentColor() iterates this table to
--- repaint every accent-colored Drawing object live.
+
 local _accentObjects = {}  -- array of Drawing objects whose .Color = AccentColor
 
 local function trackAccent(obj)
     table.insert(_accentObjects, obj)
 end
 
--- ─────────────────────────────────────────────────────────────
 -- THEME COLOR REGISTRY
--- ─────────────────────────────────────────────────────────────
--- Maps each Theme key to a list of Drawing objects that use it.
--- SetThemeColor() looks up the key directly — no fragile color comparison.
+
 local _themeObjects = {}  -- { [themeKey] = { obj, ... } }
 
 local function trackTheme(key, obj)
@@ -194,14 +180,7 @@ local function trackTheme(key, obj)
     table.insert(_themeObjects[key], obj)
 end
 
--- ─────────────────────────────────────────────────────────────
 -- WINDOW CONSTRUCTOR
--- ─────────────────────────────────────────────────────────────
--- Returns a Window object. All elements are added to a window.
--- Layout:
---   TopBar  (title, minimize, close)
---   LeftBar (categories)
---   Content (element panels per category)
 
 local TOPBAR_H    = 28
 local LEFTBAR_W   = 120
@@ -268,9 +247,9 @@ function MatchaUI.CreateWindow(opts)
     local contentBg = draw(makeRect(wx + LEFTBAR_W, wy + TOPBAR_H, ww - LEFTBAR_W, wh - TOPBAR_H, Theme.ContentBg, baseZ+2, true))
     trackTheme("ContentBg", contentBg)
 
-    -- ─────────────────────────────
+
     -- Reposition helper (drag)
-    -- ─────────────────────────────
+
     local function reposition(nx, ny)
         local dx, dy = nx - win.X, ny - win.Y
         win.X, win.Y = nx, ny
@@ -355,16 +334,14 @@ function MatchaUI.CreateWindow(opts)
         end
     end
 
-    -- ─────────────────────────────
+
     -- Visibility helpers
-    -- ─────────────────────────────
+
     local function setWinVisible(state)
         win.Visible = state
         for _, d in ipairs(win._draws) do
             pcall(function() d.Visible = state end)
-        end
-        -- When becoming visible, show ONLY the active category's elements.
-        -- All other categories must stay hidden.
+        end.
         for _, cat in ipairs(win.Categories) do
             local showCat = state and (win.ActiveCat == cat)
             for _, elem in ipairs(cat._elemObjs) do
@@ -372,7 +349,6 @@ function MatchaUI.CreateWindow(opts)
                     pcall(function() obj.Visible = showCat end)
                 end
             end
-            -- On show, restore correct per-element sub-object states for active cat
             if showCat then
                 for _, elem in ipairs(win._elements) do
                     if elem._cat ~= cat then continue end
@@ -412,7 +388,6 @@ function MatchaUI.CreateWindow(opts)
                 end
             end
         end
-        -- Clear focused input on hide
         if not state and _focusedInput then
             _focusedInput.Focused = false
             if _focusedInput._cursor then _focusedInput._cursor.Visible = false end
@@ -453,7 +428,7 @@ function MatchaUI.CreateWindow(opts)
                         pcall(function() obj.Visible = showContent end)
                     end
                 end
-                -- On un-minimize, restore correct per-element sub-object states
+
                 if showContent then
                     for _, elem in ipairs(win._elements) do
                         if elem._cat ~= cat then continue end
@@ -505,9 +480,8 @@ function MatchaUI.CreateWindow(opts)
         minTxt.Text = win.Minimized and "+" or "-"
     end
 
-    -- ─────────────────────────────
     -- Add Category
-    -- ─────────────────────────────
+
     local function addCategory(name)
         local idx  = #win.Categories
         local cy   = win.Y + TOPBAR_H + idx * CAT_H + 4
@@ -554,10 +528,8 @@ function MatchaUI.CreateWindow(opts)
         return ww - LEFTBAR_W - CONTENT_PAD * 2
     end
 
-    -- Activate a category (show its content, hide others)
     local function activateCategory(cat)
         if win.ActiveCat == cat then return end
-        -- hide old
         if win.ActiveCat then
             win.ActiveCat._bg.Color = Theme.LeftBar
             for _, elem in ipairs(win.ActiveCat._elemObjs) do
@@ -565,7 +537,6 @@ function MatchaUI.CreateWindow(opts)
                     pcall(function() obj.Visible = false end)
                 end
             end
-            -- Ensure the focused input loses focus when switching categories
             if _focusedInput and _focusedInput._cat == win.ActiveCat then
                 _focusedInput.Focused = false
                 if _focusedInput._cursor then _focusedInput._cursor.Visible = false end
@@ -581,14 +552,12 @@ function MatchaUI.CreateWindow(opts)
                 pcall(function() obj.Visible = true end)
             end
         end
-        -- Correct per-element sub-object states AFTER making the base set visible
         for _, elem in ipairs(win._elements) do
             if elem._cat ~= cat then continue end
             -- Checkbox: marker only visible if checked
             if elem.Type == "Checkbox" and elem._check then
                 elem._check.Visible = elem.State
             end
-            -- TextInput: cursor always starts hidden until re-focused
             if (elem.Type == "TextInput") and elem._cursor then
                 elem._cursor.Visible = false
             end
@@ -601,7 +570,6 @@ function MatchaUI.CreateWindow(opts)
                     item._txt.Visible = false
                 end
             end
-            -- ColorPicker: panel always starts closed
             if elem.Type == "ColorPicker" then
                 elem._cpOpen = false
                 elem._arrowTxt.Text = ">"
@@ -624,12 +592,8 @@ function MatchaUI.CreateWindow(opts)
         end
     end
 
-    -- ─────────────────────────────
     -- ELEMENT BUILDERS
-    -- (all return an element table)
-    -- ─────────────────────────────
 
-    -- Helper: register element draw-objects with a category
     local function registerElem(cat, objs, h)
         objs._h = h or ELEM_H
         table.insert(cat._elemObjs, objs)
@@ -641,14 +605,12 @@ function MatchaUI.CreateWindow(opts)
         end
     end
 
-    -- Helper: register an element descriptor and tag it with its category
     local function registerElemDesc(cat, elem)
         elem._cat = cat
         table.insert(win._elements, elem)
         return elem
     end
 
-    -- ── SECTION HEADER (grouping label)
     local function addSection(cat, labelText)
         local cx  = contentX()
         local cw  = contentW()
@@ -664,7 +626,6 @@ function MatchaUI.CreateWindow(opts)
         return objs
     end
 
-    -- ── BUTTON
     local function addButton(cat, labelText, callback)
         local cx  = contentX()
         local cw  = contentW()
@@ -686,7 +647,6 @@ function MatchaUI.CreateWindow(opts)
         return elem
     end
 
-    -- ── TOGGLE
     local function addToggle(cat, labelText, default, callback)
         local cx  = contentX()
         local cw  = contentW()
@@ -722,7 +682,6 @@ function MatchaUI.CreateWindow(opts)
         return elem
     end
 
-    -- ── SLIDER
     local function addSlider(cat, labelText, min, max, default, callback)
         local cx  = contentX()
         local cw  = contentW()
@@ -770,7 +729,6 @@ function MatchaUI.CreateWindow(opts)
         return elem
     end
 
-    -- ── DROPDOWN
     local function addDropdown(cat, labelText, options, default, callback)
         local cx  = contentX()
         local cw  = contentW()
@@ -791,11 +749,6 @@ function MatchaUI.CreateWindow(opts)
         table.insert(objs, bg) table.insert(objs, lbl) table.insert(objs, boxBg)
         table.insert(objs, selTxt) table.insert(objs, arrow)
 
-        -- Dropdown items (hidden by default, high Z)
-        -- Items are built at y=0 (placeholder). Their real position is computed on open
-        -- by reading the current _bg.Position so they always anchor to the actual
-        -- visual location of the dropdown box — even inside a ScrollFrame that has shifted
-        -- or scrolled the element after construction.
         local itemObjs = {}
         local dropBaseZ = baseZ + 50  -- always on top
         for i, opt in ipairs(options or {}) do
@@ -820,12 +773,7 @@ function MatchaUI.CreateWindow(opts)
             Callback=callback, Options=options or {},
         }
         -- ── SetOptions: replace the item list of this dropdown at runtime.
-        -- Usage: dropdownElem:SetOptions({"A","B","C"}, "A")
-        -- • Closes the dropdown if open.
-        -- • Removes old item Drawing objects from _objects, _themeObjects, and objs.
-        -- • Creates new items following the exact same pattern as construction time.
-        -- • Updates elem.Options, elem._itemObjs, elem.Selected, and elem._selTxt.
-        -- • newDefault is optional; if omitted defaults to newOpts[1] or "None".
+
         function elem:SetOptions(newOpts, newDefault)
             newOpts = newOpts or {}
 
@@ -840,19 +788,14 @@ function MatchaUI.CreateWindow(opts)
                 MatchaUI.Choosing = false
             end
 
-            -- 2. Remove old item Drawing objects from every registry that holds them.
-            --    objs[1..5] are the fixed draws (bg, lbl, boxBg, selTxt, arrow).
-            --    Items occupy objs[6..end] — strip them.
             for i = #objs, 6, -1 do
                 local obj = objs[i]
-                -- Remove from global _objects list
                 for gi = #_objects, 1, -1 do
                     if _objects[gi] == obj then
                         table.remove(_objects, gi)
                         break
                     end
                 end
-                -- Remove from _themeObjects (TextPrimary and DropdownItem)
                 for _, bucket in pairs(_themeObjects) do
                     for ti = #bucket, 1, -1 do
                         if bucket[ti] == obj then
@@ -861,7 +804,6 @@ function MatchaUI.CreateWindow(opts)
                         end
                     end
                 end
-                -- Remove from _textObjects so SetFont stops referencing dead objects
                 for xi = #_textObjects, 1, -1 do
                     if _textObjects[xi] == obj then
                         table.remove(_textObjects, xi)
@@ -872,7 +814,6 @@ function MatchaUI.CreateWindow(opts)
                 table.remove(objs, i)
             end
 
-            -- 3. Build new item Drawing objects (mirrors the construction-time loop)
             local newItemObjs = {}
             local dropBaseZ   = baseZ + 50
             for i, opt in ipairs(newOpts) do
@@ -906,7 +847,6 @@ function MatchaUI.CreateWindow(opts)
                 table.insert(objs, iTxt)
             end
 
-            -- 4. Update the element descriptor
             self._itemObjs = newItemObjs
             self.Options   = newOpts
 
@@ -968,11 +908,9 @@ function MatchaUI.CreateWindow(opts)
         local by = cy + ELEM_H/2 - boxSz/2
         local box  = draw(makeRect(bx, by, boxSz, boxSz, Theme.InputBg, baseZ+6, true))
         trackTheme("InputBg", box)
-        -- border
         local boxBorder = draw(makeRect(bx, by, boxSz, boxSz, Theme.ElementBorder, baseZ+6, false))
         trackTheme("ElementBorder", boxBorder)
         boxBorder.Filled = false
-        -- check mark (filled accent square inside)
         local check = draw(makeRect(bx+3, by+3, boxSz-6, boxSz-6, Theme.AccentOn, baseZ+7, true))
         trackAccent(check)
         check.Visible = state
@@ -1018,11 +956,7 @@ function MatchaUI.CreateWindow(opts)
     end
 
     -- ── COLOR PICKER
-    -- Layout:
-    --   Header row : [Label]  [Preview swatch]  [> button]
-    --   Panel (opens to the RIGHT of the window, floating):
-    --     Left  : hex color palette (10 cols × 8 rows of swatches)
-    --     Right : R/G/B +/- steppers + hex label + live preview
+
     local function addColorPicker(cat, labelText, defaultColor, callback)
         local cx  = contentX()
         local cw  = contentW()
@@ -1031,7 +965,7 @@ function MatchaUI.CreateWindow(opts)
         local color = defaultColor or Color3.fromRGB(255, 100, 100)
         local objs = {}
 
-        -- ── Header row ──────────────────────────────────────────────────
+        -- ── Header row
         local bg      = draw(makeRect(cx, cy, cw, rowH, Theme.ElementBg, baseZ+5, true))
         trackTheme("ElementBg", bg)
         local lbl     = draw(makeText(labelText, cx + 8, cy + 6, 12, Theme.TextSecondary, baseZ+6, false, true))
@@ -1044,8 +978,8 @@ function MatchaUI.CreateWindow(opts)
         table.insert(objs, bg) table.insert(objs, lbl) table.insert(objs, preview)
         table.insert(objs, arrowBtn) table.insert(objs, arrowTxt)
 
-        -- ── Panel geometry: opens to the RIGHT of the whole window ───────
-        -- panelX is right edge of the window + 4px gap
+        -- ── Panel geometry: opens to the RIGHT of the whole window 
+
         local panelX  = win.X + ww + 4
         local panelY  = cy
         local swatchSz = 16   -- each palette swatch cell
@@ -1059,17 +993,11 @@ function MatchaUI.CreateWindow(opts)
         local panelW  = palW + 8 + rsAreaW + 8
         local panelH  = palH + 8    -- a little padding top+bottom
 
-        -- panelObjs: panel-only objects — excluded from ScrollFrame clipping.
-        -- Their visibility is controlled exclusively by _cpOpen toggle logic.
         local panelObjs = {}
-        -- panelObjOffsets: parallel table storing each panelObj's position
-        -- relative to (panelX, panelY) at build time. Used by the open logic
-        -- to SET absolute positions without accumulating repeated deltas.
         local panelObjOffsets = {}
         local function addPanelObj(o)
             table.insert(panelObjs, o)
             table.insert(objs, o)
-            -- Record relative offset from panel origin at the moment of construction
             pcall(function()
                 table.insert(panelObjOffsets, {
                     dx = o.Position.X - panelX,
@@ -1082,7 +1010,6 @@ function MatchaUI.CreateWindow(opts)
         local panelBg = addPanelObj(draw(makeRect(panelX, panelY, panelW, panelH + 4, Theme.DropdownBg, baseZ+50, true)))
         trackTheme("DropdownBg", panelBg)
         panelBg.Visible = false
-        -- thin accent border around panel
         local panelBorder = addPanelObj(draw(makeRect(panelX, panelY, panelW, panelH + 4, Theme.ElementBorder, baseZ+50, false)))
         trackTheme("ElementBorder", panelBorder)
         panelBorder.Filled = false panelBorder.Thickness = 1 panelBorder.Visible = false
@@ -1122,13 +1049,11 @@ function MatchaUI.CreateWindow(opts)
                 _color=Color3.fromRGB(r2,g2,b2)})
         end
 
-        -- ── RGB sliders (right side of panel) ────────────────────────────
+        -- ── RGB sliders (right side of panel)
         local function colorToHex(c)
             return string.format("#%02X%02X%02X", math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255))
         end
 
-        -- Layout: each channel row has a label, value text, and a drag slider track
-        -- Row height = 24px; 3 rows + hex/preview below
         local chRowH   = 24
         local slPad    = 4      -- left padding inside rs area
         local lblW     = 12     -- "R"/"G"/"B" label width
@@ -1141,7 +1066,6 @@ function MatchaUI.CreateWindow(opts)
         local channelSliders = {}
         local btnObjs = {}  -- kept empty; no +/- buttons any more
 
-        -- Channel colors for slider fills
         local chFillColors = {
             R = Color3.fromRGB(220, 60, 60),
             G = Color3.fromRGB(60, 200, 60),
@@ -1155,13 +1079,11 @@ function MatchaUI.CreateWindow(opts)
         for ci, ch in ipairs(channels) do
             local rowY = panelY + 4 + (ci-1) * chRowH
 
-            -- Channel label ("R" / "G" / "B")
             local lbl2 = draw(makeText(ch, rsAreaX + slPad, rowY + 6, 11,
                 Theme.TextSecondary, baseZ+52, false, false))
             lbl2.Visible = false
             addPanelObj(lbl2)
 
-            -- Numeric value display
             local initV = math.floor((ch=="R" and color.R or ch=="G" and color.G or color.B) * 255)
             local valT  = draw(makeText(tostring(initV),
                 rsAreaX + slPad + lblW + 2, rowY + 6, 11,
@@ -1169,13 +1091,11 @@ function MatchaUI.CreateWindow(opts)
             valT.Visible = false
             addPanelObj(valT)
 
-            -- Slider track background
             local trackBg2 = draw(makeRect(slTrackX, rowY + 8, slTrackW, 4,
                 Theme.SliderTrack, baseZ+52, true))
             trackBg2.Visible = false
             addPanelObj(trackBg2)
 
-            -- Slider fill (channel-colored)
             local initPct  = initV / 255
             local initFillW = math.max(1, math.floor(slTrackW * initPct))
             local fillRect2 = draw(makeRect(slTrackX, rowY + 8, initFillW, 4,
@@ -1183,7 +1103,6 @@ function MatchaUI.CreateWindow(opts)
             fillRect2.Visible = false
             addPanelObj(fillRect2)
 
-            -- Knob
             local knobX2 = slTrackX + initFillW - knobW2/2
             local knobY2 = rowY + 3
             local knob2  = draw(makeRect(knobX2, knobY2, knobW2, 14,
@@ -1191,7 +1110,6 @@ function MatchaUI.CreateWindow(opts)
             knob2.Visible = false
             addPanelObj(knob2)
 
-            -- Dummy _bg/_fill/_lbl/_val references expected by legacy reset code
             local slInfo = {
                 _lbl=lbl2, _val=valT,
                 _bg=trackBg2, _fill=fillRect2,
@@ -1203,7 +1121,6 @@ function MatchaUI.CreateWindow(opts)
             }
             channelSliders[ch] = slInfo
 
-            -- Register drag hit zone (the full row strip)
             table.insert(btnObjs, {
                 _x=slTrackX, _y=rowY+2, _w=slTrackW, _h=16,
                 _ch=ch, _isSlider=true,
@@ -1223,7 +1140,6 @@ function MatchaUI.CreateWindow(opts)
             end
         end
 
-        -- Hex label + live preview patch (below the 3 channel rows)
         local hexLblY  = panelY + 4 + 3*chRowH + 4
         local hexLabel = addPanelObj(draw(makeText(colorToHex(color), rsAreaX + slPad, hexLblY, 10,
             Theme.TextSecondary, baseZ+52, false, false)))
@@ -1235,8 +1151,6 @@ function MatchaUI.CreateWindow(opts)
 
         registerElem(cat, objs, rowH)
 
-        -- refreshAll: always reads elem.Color (set by caller before invoking)
-        -- Uses a forward-ref table (_elemRef) so the closure can access elem after creation.
         local _elemRef = {}
 
         local function refreshAll()
@@ -1290,28 +1204,21 @@ function MatchaUI.CreateWindow(opts)
             _rsW=rsAreaW, _rsH=14, _rsX=rsAreaX,
             Callback=callback,
         }
-        -- Store original swatch hit-test coords relative to panel origin
         for _, sw in ipairs(paletteSwatches) do
             sw._origDX = sw._x - panelX
             sw._origDY = sw._y - panelY
         end
-        -- Store original btn hit-test coords relative to panel origin
         for _, btn in ipairs(btnObjs) do
             btn._origDX = btn._x - panelX
             btn._origDY = btn._y - panelY
             if btn._trackX then btn._origTrackDX = btn._trackX - panelX end
             if btn._knobY  then btn._origKnobDY  = btn._knobY  - panelY end
         end
-        -- Store original channelSlider coords relative to panel origin
         for _, s in pairs(channelSliders) do
             if s._trackX then s._origTrackDX = s._trackX - panelX end
             if s._knobY  then s._origKnobDY  = s._knobY  - panelY end
             if s._rowY   then s._origRowDY   = s._rowY   - panelY end
         end
-        -- Wire forward ref so refreshAll can read elem.Color
-        _elemRef.Color          = nil   -- will be kept in sync via elem.Color
-        _elemRef._channelSliders = channelSliders
-        -- Override _refreshAll with a closure that always reads elem.Color
         elem._refreshAll = function()
             _elemRef.Color = elem.Color
             refreshAll()
@@ -1368,11 +1275,6 @@ function MatchaUI.CreateWindow(opts)
         return elem
     end
 
-    -- ── SCROLLING FRAME
-    -- visH  : visible height of the frame (px). innerH auto-grows as widgets are added.
-    -- Supports both text rows (AddItem) and full UI elements (AddWidget).
-    -- Scrolling is controlled by dragging the scrollbar thumb or content drag.
-    -- Each frame in the main loop re-positions and clips all child objects.
     local function addScrollFrame(cat, innerH, callback, customVisH)
         local cx   = contentX()
         local cw   = contentW()
@@ -1398,8 +1300,6 @@ function MatchaUI.CreateWindow(opts)
         table.insert(objs, sbTrack) table.insert(objs, thumb)
         registerElem(cat, objs, visH)
 
-        -- BUG 2 FIX: content width leaves room for the scrollbar so widgets never overlap it.
-        -- 10 = 8px scrollbar track + 2px inner padding gap.
         local contentPadRight = 10
         local innerCW = cw - contentPadRight
 
@@ -1417,12 +1317,10 @@ function MatchaUI.CreateWindow(opts)
             Callback=callback,
         }
 
-        -- AddItem: add a labelled text row into the scroll frame (legacy API).
         function elem:AddItem(text)
             local rowIdx = #self._items
             local relY   = rowIdx * self._itemH + 4
             local absY   = self._y + relY
-            -- BUG 2 FIX: use innerCW (captured from outer scope) so text never overlaps the scrollbar.
             local _ = innerCW  -- referenced for closure
             local txt    = draw(makeText(
                 text, self._x + 6, absY, 12, Theme.TextPrimary, baseZ+8, false, false
@@ -1430,7 +1328,6 @@ function MatchaUI.CreateWindow(opts)
             txt.Visible = (absY >= self._y) and (absY + self._itemH <= self._y + self._h)
             table.insert(self._items, {_txt=txt, _relY=relY})
             table.insert(objs, txt)
-            -- Grow innerH to fit all items
             local neededH = (#self._items) * self._itemH + 8
             if neededH > self._innerH then
                 self._innerH = neededH
@@ -1442,23 +1339,7 @@ function MatchaUI.CreateWindow(opts)
             return txt
         end
 
-        -- AddWidget: embed a full UI element (Button, Toggle, Checkbox, Slider, Dropdown…)
-        -- inside the scroll frame. The element is built normally via the cat builders, but
-        -- its draw objects are detached from the category layout and owned by the frame.
-        -- @param builder   function()  — a zero-argument closure that calls the add* function
-        --                                and returns the element descriptor.
-        -- @returns the element descriptor (same as calling the builder directly).
-        --
-        -- Usage:
-        --   scrollFrame:AddWidget(function()
-        --       return Window.AddButton(catFoo, "My Button", callback)
-        --   end)
-        --
-        -- The widget is positioned relative to the scroll frame's content area and will
-        -- scroll with the frame. Its height is taken from elem._h on the descriptor.
         function elem:AddWidget(builder)
-            -- Temporarily adjust the category cursor so the element lands inside us.
-            -- We compute the desired relY (distance from top of scroll frame content).
             local neededInnerH = 0
             for _, w in ipairs(self._widgets) do
                 neededInnerH = neededInnerH + w._h + 2
@@ -1467,23 +1348,14 @@ function MatchaUI.CreateWindow(opts)
                 neededInnerH = neededInnerH + self._itemH
             end
             local relY = neededInnerH + 4
-
-            -- Build the element. It will be placed at the current cat cursor,
-            -- which is (cy + relY - scrollY). We must compensate for the cursor offset.
             local builtElem = builder()
             if not builtElem then return nil end
 
             local wh = builtElem._h or ELEM_H
-            -- Move all of this element's draw objects into the frame's ownership
-            -- and shift them to relY inside the frame.
             local absY = self._y + relY - self._scrollY
             local dyFix = absY - (builtElem._y or absY)
-
-            -- BUG 2 FIX: shrink widget width to innerCW (content area excluding scrollbar).
-            -- This prevents buttons, sliders, etc. from visually overlapping the scrollbar.
             local dxW = innerCW - (builtElem._w or cw)
             if dxW < 0 then
-                -- Only shrink, never expand. Apply to the element's own _bg draw object.
                 if builtElem._bg then
                     pcall(function()
                         local s = builtElem._bg.Size
@@ -1492,32 +1364,19 @@ function MatchaUI.CreateWindow(opts)
                 end
                 builtElem._w = (builtElem._w or cw) + dxW
             end
-
-            -- Mark this element as living inside a ScrollFrame so the main interaction
-            -- loop uses the frame's visibility, not elem._bg.Visible, as the gate.
             builtElem._inScrollFrame = true
-
-            -- Build a set of objects that must never be force-shown/hidden by the clipping
-            -- pass. This includes:
-            --   • ColorPicker panel objects (their visibility is controlled by _cpOpen).
-            --   • Dropdown item objects (their visibility is controlled by _isOpen).
-            -- BUG 3 FIX: Dropdown items must be in this set so the clipping loop never
-            -- makes them visible while their parent is closed.
             local panelObjSet = {}
             if builtElem._panelObjs then
                 for _, po in ipairs(builtElem._panelObjs) do
                     panelObjSet[po] = true
                 end
             end
-            -- Dropdown popup items
             if builtElem.Type == "Dropdown" and builtElem._itemObjs then
                 for _, item in ipairs(builtElem._itemObjs) do
                     if item._bg  then panelObjSet[item._bg]  = true end
                     if item._txt then panelObjSet[item._txt] = true end
                 end
             end
-
-            -- Collect the draw objects from the last cat._elemObjs entry (the one just added)
             local lastObjs = cat._elemObjs[#cat._elemObjs]
             local widgetObjs = {}
             if lastObjs then
@@ -1525,58 +1384,31 @@ function MatchaUI.CreateWindow(opts)
                     table.insert(widgetObjs, o)
                     table.insert(objs, o)
                     if panelObjSet[o] then
-                        -- Panel/popup objects float outside the frame — never shift, never clip.
-                        -- Leave them at Visible=false; open/close toggle controls them.
                     else
-                        -- shift vertically to align inside the scroll frame
                         pcall(function() o.Position = o.Position + Vector2.new(0, dyFix) end)
-                        -- start clipped
                         local oAbsY = o.Position.Y
                         o.Visible = (oAbsY >= self._y) and (oAbsY < self._y + self._h)
                     end
                 end
-                -- Remove from cat layout management (we own it now)
                 table.remove(cat._elemObjs, #cat._elemObjs)
             end
 
-            -- Patch element descriptor Y coordinates to match actual position
             if builtElem._y then builtElem._y = builtElem._y + dyFix end
             if builtElem._ty then builtElem._ty = builtElem._ty + dyFix end
             if builtElem._trackY then builtElem._trackY = builtElem._trackY + dyFix end
 
-            -- BUG 4 FIX: also patch Dropdown item hit-test _y to match the shifted position.
-            -- Without this, clicking items fires at wrong Y coords that never match the mouse.
             if builtElem.Type == "Dropdown" and builtElem._itemObjs then
                 for _, item in ipairs(builtElem._itemObjs) do
                     if item._y then item._y = item._y + dyFix end
                 end
             end
 
-            -- For ColorPicker inside ScrollFrame: store the BASE Y of the header row
-            -- (after dyFix is applied) so the scroll loop can SET (not accumulate) absolute
-            -- hit-test coords every frame. Accumulating dy each frame causes unbounded drift.
             if builtElem.Type == "ColorPicker" then
-                -- _headerY has already been patched above via the generic _y patch? No —
-                -- _headerY is a separate field. Patch it now and store as base.
                 if builtElem._headerY then
                     builtElem._headerY = builtElem._headerY + dyFix
                 end
-                -- _origHeaderY: the Y the header sits at when scrollY==0 and relY is at top.
-                -- We store it AFTER dyFix so it matches the frame-relative position.
                 builtElem._origHeaderY = builtElem._headerY  -- absolute Y when scrollY=0
 
-                -- Also patch btnObjs and channelSliders Y by dyFix.
-                -- BUG FIX: Widget ColorPicker Slider Offset
-                -- _orig* offsets (e.g. _origKnobDY, _origDY, _origTrackDX) are relative to
-                -- panelY AT BUILD TIME. When the panel opens, the logic sets absolute positions
-                -- using:  newPanelY + _origKnobDY
-                -- where   newPanelY = bgPos.Y  (the header's current screen Y).
-                -- Since AddWidget already shifts elem._bg by dyFix, bgPos.Y = cy + dyFix,
-                -- which correctly captures the widget's offset from the frame top.
-                -- Therefore _orig* values must NOT be modified by dyFix here — doing so would
-                -- cause a double-offset: (cy + dyFix) + (origOffset + dyFix) = correct + dyFix.
-                -- The same logic applies to all _origDY, _origKnobDY, _origTrackDX, _origRowDY.
-                -- We still patch the runtime _y/_knobY/_rowY for hit-testing before first open.
                 for _, btn in ipairs(builtElem._btnObjs or {}) do
                     if btn._y      then btn._y      = btn._y      + dyFix end
                     if btn._knobY  then btn._knobY  = btn._knobY  + dyFix end
@@ -1592,7 +1424,6 @@ function MatchaUI.CreateWindow(opts)
 
             table.insert(self._widgets, {_objs=widgetObjs, _relY=relY, _h=wh, _elem=builtElem, _panelObjSet=panelObjSet})
 
-            -- Grow scroll content height
             local totalH = relY + wh + 8
             if totalH > self._innerH then
                 self._innerH = totalH
@@ -1611,7 +1442,6 @@ function MatchaUI.CreateWindow(opts)
         return elem
     end
 
-    -- ── TOOLTIP (attached to element, shown on hover)
     local function addTooltip(elem, tipText)
         local ttBg  = newDraw("Square")
         ttBg.Size   = Vector2.new(#tipText * 7 + 12, 20)
@@ -1635,9 +1465,9 @@ function MatchaUI.CreateWindow(opts)
         return tip
     end
 
-    -- ─────────────────────────────
+
     -- Expose public API on window
-    -- ─────────────────────────────
+
     win.AddCategory    = addCategory
     win.AddSection     = addSection
     win.AddButton      = addButton
@@ -1674,22 +1504,17 @@ function MatchaUI.CreateWindow(opts)
     return win
 end
 
--- ─────────────────────────────────────────────────────────────
+
 -- NOTIFICATION SYSTEM
--- ─────────────────────────────────────────────────────────────
+
 local NOTIF_W       = 240
 local NOTIF_PAD     = 6
 local NOTIF_DUR     = 4   -- seconds
 local NOTIF_INNER_W = NOTIF_W - 16   -- 8px padding each side
--- Approximate character width at size 12 (Monospace). Used for word-wrap.
 local NOTIF_CHAR_W  = 7
 
--- Notifications spawn at top-left (50, 50) and stack downward.
 local NOTIF_START_X = 50
 local NOTIF_START_Y = 150
-
--- Word-wrap a string to fit within maxChars per line.
--- Returns a table of line strings and the total line count.
 local function _wrapText(text, maxChars)
     local lines = {}
     local words = {}
@@ -1705,7 +1530,6 @@ local function _wrapText(text, maxChars)
             if line ~= "" then
                 table.insert(lines, line)
             end
-            -- If the single word itself exceeds maxChars, hard-break it
             while #w > maxChars do
                 table.insert(lines, w:sub(1, maxChars))
                 w = w:sub(maxChars + 1)
@@ -1736,13 +1560,10 @@ end
 function MatchaUI.Notify(title, message, duration)
     local nx  = NOTIF_START_X
     local ny  = NOTIF_START_Y
-    -- Stack below existing notifications (actual Y set by _layoutNotifs)
     local dur = duration or NOTIF_DUR
 
-    -- Pre-calculate wrapped lines so we know how tall the notification must be
     local maxChars = math.floor(NOTIF_INNER_W / NOTIF_CHAR_W)
     local msgLines = _wrapText(message or "", maxChars)
-    -- Height: 6 (top pad) + 13 (title) + 3 (gap) + lines*14 + 6 (bottom pad) + 4 (bar)
     local NOTIF_H = 6 + 13 + 3 + (#msgLines * 14) + 6 + 4
 
     local bg   = newDraw("Square")
@@ -1765,7 +1586,6 @@ function MatchaUI.Notify(title, message, duration)
     tTitle.Transparency = 1
     tTitle.Visible     = true
 
-    -- Create one Drawing.Text object per wrapped line
     local tMsgObjs = {}
     for li, lineStr in ipairs(msgLines) do
         local lObj = newDraw("Text")
@@ -1781,7 +1601,6 @@ function MatchaUI.Notify(title, message, duration)
         table.insert(tMsgObjs, lObj)
     end
 
-    -- Horizontal progress bar (time remaining indicator)
     local bar = newDraw("Square")
     bar.Position   = Vector2.new(nx, ny + NOTIF_H - 4)
     bar.Size       = Vector2.new(NOTIF_W, 4)
@@ -1800,10 +1619,8 @@ function MatchaUI.Notify(title, message, duration)
     return notif
 end
 
--- ─────────────────────────────────────────────────────────────
 -- DEFAULT BUILT-IN PRESETS
--- Used by AddConfigPreset when no presets table is supplied.
--- ─────────────────────────────────────────────────────────────
+
 local DEFAULT_PRESETS = {
     ["Default (Matcha)"] = {
         accent        = Color3.fromHex("#CE447E"),
@@ -1828,7 +1645,7 @@ local DEFAULT_PRESETS = {
         TooltipBg     = Color3.fromHex("#050505"),
         NotifBg       = Color3.fromHex("#111111"),
         ScrollBar     = Color3.fromHex("#1A1A1A"),
-        TitleText     = Color3.fromHex("#CE447E"),
+        TitleText     = Color3.fromHex("#FFFFFF"),
         CloseBtn      = Color3.fromHex("#CC2200"),
         MinimizeBtn   = Color3.fromHex("#444444"),
         SectionHeader = Color3.fromHex("#1A1A1A"),
@@ -1947,31 +1764,8 @@ local DEFAULT_PRESETS = {
     },
 }
 
--- ─────────────────────────────────────────────────────────────
 -- ADD CONFIG PRESET
--- ─────────────────────────────────────────────────────────────
--- Creates a self-contained "Config" category on the window that
--- handles everything: keybind, accent, font, full preset switching,
--- named custom theme save/load — all auto-saved on every change and
--- auto-loaded on call (before UiLib.Run).
---
--- ALL options are optional. Minimal usage:
---   Window.AddConfigPreset({})
---   Window.AddConfigPreset()
---
--- Options (all optional):
---   toggleKeybind   handle   external keybind widget whose .Key is kept in sync.
---                            When nil, the Config category's own keybind widget
---                            drives window show/hide automatically via an internal
---                            polling thread — no external setup needed.
---   configPath      string   override default save path (default: "MatchaUI/Config.json")
---   themesDir       string   override default themes folder (default: "MatchaUI/Themes")
---   presets         table    built-in preset table { [name]={accent,keys...} }
---                            when nil, the 5 built-in MatchaUI presets are used:
---                            "Default (Lime)", "Crimson", "Ocean", "Sunset", "Monochrome"
---
--- The category is created, populated, and the saved config is applied
--- before this function returns.  Call it before UiLib.Run().
+
 function MatchaUI.AddConfigPreset(win, opts)
     opts = opts or {}
     local CONFIG_PATH = opts.configPath or "MatchaUI/Config.json"
@@ -1979,7 +1773,7 @@ function MatchaUI.AddConfigPreset(win, opts)
     local kbHandle    = opts.toggleKeybind   -- may be nil; internal kbWidget used instead
     local builtinPresets = opts.presets or DEFAULT_PRESETS
 
-    -- ── Helpers ───────────────────────────────────────────────
+    -- ── Helpers
     local function c3hex(c)
         return string.format("#%02X%02X%02X",
             math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255))
@@ -2001,7 +1795,7 @@ function MatchaUI.AddConfigPreset(win, opts)
         "ScrollBar","TitleText","CloseBtn","MinimizeBtn","SectionHeader",
     }
 
-    -- ── Defaults ──────────────────────────────────────────────
+    -- ── Defaults
     local DEFAULT = {
         ToggleKeybindVK = kbHandle and kbHandle.Key or 0x2D,
         AccentHex       = "#39FF14",
@@ -2012,7 +1806,7 @@ function MatchaUI.AddConfigPreset(win, opts)
         ThemeColors     = {},
     }
 
-    -- ── Live state (written to disk on every change) ───────────
+    -- ── Live state
     local _cfg = {
         ToggleKeybindVK = DEFAULT.ToggleKeybindVK,
         AccentHex       = DEFAULT.AccentHex,
@@ -2021,7 +1815,7 @@ function MatchaUI.AddConfigPreset(win, opts)
         ThemeColors     = {},  -- { [key] = "#RRGGBB" }
     }
 
-    -- ── Persist ───────────────────────────────────────────────
+    -- ── Persist
     local function saveConfig()
         pcall(function()
             local HttpService = game:GetService("HttpService")
@@ -2040,7 +1834,7 @@ function MatchaUI.AddConfigPreset(win, opts)
         return DEFAULT
     end
 
-    -- ── Custom theme file helpers ──────────────────────────────
+    -- ── Custom theme file helpers
     local function listCustomThemes()
         local names = {}
         if isfolder(THEMES_DIR) then
@@ -2055,18 +1849,13 @@ function MatchaUI.AddConfigPreset(win, opts)
         return names
     end
 
-    -- saveCustomTheme now saves the live ThemeColors (all individually-edited slot colors)
-    -- plus the accent hex, so the custom theme file is a complete snapshot of the UI state.
     local function saveCustomTheme(name, accentHex, themeColors)
         if not isfolder(THEMES_DIR) then pcall(makefolder, THEMES_DIR) end
         local out = { accentHex = accentHex }
-        -- Persist every theme slot. If the user has picked a color for a slot via the
-        -- Theme Key picker, use that; otherwise fall back to the live Theme table default.
         for _, k in ipairs(THEME_SLOT_KEYS) do
             if themeColors and themeColors[k] then
                 out[k] = themeColors[k]
             else
-                -- Read live color from Theme table as fallback
                 local liveColor = Theme and Theme[k]
                 out[k] = liveColor and c3hex(liveColor) or "#000000"
             end
@@ -2089,7 +1878,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         return nil
     end
 
-    -- ── Apply a custom theme data table to the live UI ─────────
     local function applyCustomData(data)
         local accent = hex3c(data.accentHex or "#39FF14")
         MatchaUI.SetAccentColor(accent)
@@ -2100,7 +1888,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         end
     end
 
-    -- ── Apply a built-in preset ────────────────────────────────
     local function applyBuiltinPreset(name)
         local p = builtinPresets[name]
         if not p then return false end
@@ -2111,8 +1898,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         return true
     end
 
-    -- Widget handles populated after the category is built — used by applyConfig.
-    -- Forward-declared so applyConfig can reference them whether called early or late.
     local kbWidget   = nil   -- Keybind widget in Config cat
     local cpAccent   = nil   -- Accent ColorPicker widget in Config cat
     local ddFont     = nil   -- Font dropdown widget in Config cat
@@ -2120,9 +1905,6 @@ function MatchaUI.AddConfigPreset(win, opts)
     local cpThemeKey = nil   -- Theme Key ColorPicker widget in Config cat
     local ddThemeKey = nil   -- Theme Key dropdown widget in Config cat
 
-    -- ── Load saved config and push to live UI ──────────────────
-    -- Also syncs all Config-category widget display states so the
-    -- UI looks correct immediately on startup without user interaction.
     local function applyConfig(cfg)
         -- 1. Preset / custom theme
         local pname = cfg.ThemePreset or DEFAULT.ThemePreset
@@ -2130,23 +1912,18 @@ function MatchaUI.AddConfigPreset(win, opts)
             local data = loadCustomTheme(pname)
             if data then applyCustomData(data) end
         end
-        -- 2. Per-slot ThemeColors (individual overrides saved by the Theme Key picker).
-        --    These are applied ON TOP of the preset so manual edits persist across restarts.
         local tc = cfg.ThemeColors or {}
         for _, k in ipairs(THEME_SLOT_KEYS) do
             if tc[k] then
                 MatchaUI.SetThemeColor(k, hex3c(tc[k]))
             end
         end
-        -- 3. Accent (overrides preset accent)
         if cfg.AccentHex then
             MatchaUI.SetAccentColor(hex3c(cfg.AccentHex))
         end
-        -- 4. Font
         if cfg.Font then
             MatchaUI.SetFont(cfg.Font)
         end
-        -- 5. Keybind handle + display text (external handle passed via opts)
         if cfg.ToggleKeybindVK and kbHandle then
             kbHandle.Key = cfg.ToggleKeybindVK
             local kname = KeyNames[cfg.ToggleKeybindVK]
@@ -2155,11 +1932,6 @@ function MatchaUI.AddConfigPreset(win, opts)
                 kbHandle._kbTxt.Text = "[ "..kname.." ]"
             end
         end
-        -- 6. Sync Config-category widget visuals so they reflect the loaded state.
-        --    These widgets are nil during the first applyConfig call (before the category
-        --    is built), so guard each access. A second call from ── Auto-load ── below
-        --    fires after the widgets exist and restores all display states.
-        -- 6a. Keybind widget text
         if kbWidget and cfg.ToggleKeybindVK then
             local kname = KeyNames[cfg.ToggleKeybindVK]
                 or ("VK"..tostring(cfg.ToggleKeybindVK))
@@ -2168,24 +1940,19 @@ function MatchaUI.AddConfigPreset(win, opts)
             end
             kbWidget.Key = cfg.ToggleKeybindVK
         end
-        -- 6b. Accent ColorPicker preview swatch
         if cpAccent and cfg.AccentHex then
             cpAccent.Color   = hex3c(cfg.AccentHex)
             cpAccent._preview.Color = cpAccent.Color
             if cpAccent._prevPatch then cpAccent._prevPatch.Color = cpAccent.Color end
         end
-        -- 6c. Font dropdown selected text
         if ddFont and cfg.Font then
             ddFont.Selected   = cfg.Font
             if ddFont._selTxt then ddFont._selTxt.Text = cfg.Font end
         end
-        -- 6d. Preset dropdown selected text
         if ddPreset and cfg.ThemePreset then
             ddPreset.Selected = cfg.ThemePreset
             if ddPreset._selTxt then ddPreset._selTxt.Text = cfg.ThemePreset end
         end
-        -- 6e. Theme Key ColorPicker: update its preview to match the currently selected key's color.
-        --     The actual color is whatever the live Theme table has after step 2+3 above.
         if cpThemeKey and ddThemeKey then
             local selKey = ddThemeKey.Selected or THEME_SLOT_KEYS[1]
             local liveColor = Theme and Theme[selKey]
@@ -2197,7 +1964,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         end
     end
 
-    -- ── Build preset list ──────────────────────────────────────
     local function buildPresetList()
         local list = {}
         for name in pairs(builtinPresets) do table.insert(list, name) end
@@ -2208,10 +1974,8 @@ function MatchaUI.AddConfigPreset(win, opts)
         return list
     end
 
-    -- ── Create category ────────────────────────────────────────
     local cat = win.AddCategory("Config")
 
-    -- Section: Toggle Keybind
     win.AddSection(cat, "Toggle UI Keybind")
     kbWidget = win.AddKeybind(cat, "Toggle Keybind",
         _cfg.ToggleKeybindVK, function(key, name)
@@ -2226,7 +1990,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         end)
     win.AddTooltip(kbWidget, "Auto-saved. Also syncs the live Toggle keybind.")
 
-    -- Section: Accent Color
     win.AddSection(cat, "Accent Color")
     cpAccent = win.AddColorPicker(cat, "Accent Color",
         hex3c(_cfg.AccentHex), function(color)
@@ -2236,24 +1999,17 @@ function MatchaUI.AddConfigPreset(win, opts)
         end)
     win.AddTooltip(cpAccent, "Auto-saved. Applied on top of the active preset.")
 
-    -- Section: Theme Key
-    -- Mirrors the ExampleUsage Theme Editor workflow: pick a Theme slot from the
-    -- dropdown, then open the ColorPicker to change that slot's color live.
-    -- Every change is persisted in _cfg.ThemeColors so it survives a restart.
     win.AddSection(cat, "Theme Key Color")
     local _selectedThemeKey = THEME_SLOT_KEYS[1]
     ddThemeKey = win.AddDropdown(cat, "Theme Key",
         THEME_SLOT_KEYS,
         THEME_SLOT_KEYS[1],
         function(sel)
-            _selectedThemeKey = sel
-            -- Update the color picker preview to reflect the live color of this slot
             local liveColor = Theme and Theme[sel]
             if liveColor and cpThemeKey then
                 cpThemeKey.Color = liveColor
                 if cpThemeKey._preview  then cpThemeKey._preview.Color  = liveColor end
                 if cpThemeKey._prevPatch then cpThemeKey._prevPatch.Color = liveColor end
-                -- Sync the channel sliders if the panel is currently open
                 if cpThemeKey._cpOpen then
                     cpThemeKey._refreshAll()
                 end
@@ -2273,7 +2029,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         end)
     win.AddTooltip(cpThemeKey, "Opens the color picker. Chosen color is applied to the selected Theme key instantly and auto-saved.")
 
-    -- Section: Font
     win.AddSection(cat, "Font")
     local FONT_LIST = {"UI","System","SystemBold","Minecraft","Monospace","Pixel","Fortnite"}
     ddFont = win.AddDropdown(cat, "Global Font",
@@ -2284,21 +2039,17 @@ function MatchaUI.AddConfigPreset(win, opts)
         end)
     win.AddTooltip(ddFont, "Auto-saved. Changes all text in the UI immediately.")
 
-    -- Section: Preset
     win.AddSection(cat, "Preset")
     local presetList = buildPresetList()
     ddPreset = win.AddDropdown(cat, "Load Preset",
         #presetList > 0 and presetList or {"(none)"},
         _cfg.ThemePreset or (presetList[1] or "(none)"),
         function(sel)
-            -- Clear all individual ThemeKey overrides so the preset applies to ALL keys cleanly.
-            -- If the user wants per-slot edits after loading a preset, they can use the ThemeKey
-            -- picker again — those edits will be saved fresh.
+
             _cfg.ThemeColors = {}
 
             if builtinPresets[sel] then
                 applyBuiltinPreset(sel)
-                -- Sync accent from preset into _cfg
                 local p = builtinPresets[sel]
                 if p.accent then _cfg.AccentHex = c3hex(p.accent) end
             else
@@ -2315,7 +2066,6 @@ function MatchaUI.AddConfigPreset(win, opts)
             _cfg.ThemePreset = sel
             saveConfig()
 
-            -- Sync widget previews to reflect the newly loaded preset
             if cpAccent then
                 local newAccent = hex3c(_cfg.AccentHex)
                 cpAccent.Color = newAccent
@@ -2334,7 +2084,6 @@ function MatchaUI.AddConfigPreset(win, opts)
         end)
     win.AddTooltip(ddPreset, "Built-in presets + any saved custom themes. Auto-saved.")
 
-    -- Section: Save custom theme
     win.AddSection(cat, "Save custom theme")
     local _themeName = ""
     local inputName = win.AddTextInput(cat, "Theme name", "Enter name...", function(text)
@@ -2348,25 +2097,18 @@ function MatchaUI.AddConfigPreset(win, opts)
             MatchaUI.Notify("Save Theme", "Enter a name first.", 2)
             return
         end
-        -- Save a complete snapshot: accent + all individual ThemeColor overrides
+
         saveCustomTheme(name, _cfg.AccentHex, _cfg.ThemeColors)
         MatchaUI.Notify("Theme saved", name..".json in "..THEMES_DIR, 3)
     end)
     win.AddTooltip(btnSave,
         "Saves current accent + all Theme Key edits as a reloadable theme file.")
 
-    -- ── Auto-load from disk right now ─────────────────────────
-    -- All Config-category widgets are now built, so applyConfig can sync their displays.
     local saved = readConfig()
     for k, v in pairs(saved) do _cfg[k] = v end
-    -- Ensure ThemeColors sub-table is always present (old config files may lack it)
     if type(_cfg.ThemeColors) ~= "table" then _cfg.ThemeColors = {} end
     applyConfig(_cfg)
 
-    -- ── Internal toggle polling (only when no external handle was supplied) ──
-    -- When the caller does not pass toggleKeybind, the Config-category keybind
-    -- widget (kbWidget) IS the toggle.  A background thread polls it and
-    -- shows/hides the window — identical to what ExampleUsage does externally.
     if not opts.toggleKeybind then
         spawn(function()
             local lastDown = false
@@ -2391,13 +2133,6 @@ function MatchaUI.AddConfigPreset(win, opts)
     return cat
 end
 
--- ── Attach AddConfigPreset to every window handle via CreateWindow ──
--- We wrap it so `win.AddConfigPreset(opts)` works naturally.
--- (registered below, after CreateWindow's win table is returned)
-
--- Call this from a ColorPicker callback (or any time) to re-theme the
--- entire UI to a new accent color instantly.
--- @param color  Color3  — the new accent color
 function MatchaUI.SetAccentColor(color)
     AccentColor           = color
     Theme.CategoryActive  = color
@@ -2418,34 +2153,25 @@ function MatchaUI.SetAccentColor(color)
                 pcall(function() elem._track.Color = color end)
             end
         end
-        -- Active category bg
         if win.ActiveCat and win.ActiveCat._bg then
             pcall(function() win.ActiveCat._bg.Color = color end)
         end
     end
-    -- Repaint notification accent bars currently on screen
     for _, n in ipairs(_notifs) do
         pcall(function() n._bar.Color    = color end)
         pcall(function() n._title.Color  = color end)
     end
 end
 
--- ─────────────────────────────────────────────────────────────
+
 -- SET THEME COLOR
--- ─────────────────────────────────────────────────────────────
--- Change any Theme key (Background, TopBar, LeftBar, TextPrimary, etc.)
--- and repaint all currently-visible Drawing objects that use that color.
--- For accent-linked keys (AccentOn, SliderFill, etc.) prefer SetAccentColor.
--- @param key    string   — Theme table key (e.g. "Background", "TopBar")
--- @param color  Color3   — new color value
+
 function MatchaUI.SetThemeColor(key, color)
     if Theme[key] == nil then
         warn("MatchaUI.SetThemeColor: unknown theme key '" .. tostring(key) .. "'")
         return
     end
     Theme[key] = color
-    -- Repaint all objects registered under this exact theme key.
-    -- No color-comparison needed — each object is directly tagged to its key.
     local list = _themeObjects[key]
     if list then
         for _, obj in ipairs(list) do
@@ -2454,30 +2180,31 @@ function MatchaUI.SetThemeColor(key, color)
     end
 end
 
--- ─────────────────────────────────────────────────────────────
+
 -- SET FONT
--- ─────────────────────────────────────────────────────────────
+
 -- Change the global font for all text Drawing objects immediately.
 -- Available font names: UI, System, SystemBold, Minecraft, Monospace, Pixel, Fortnite
 -- @param fontName  string  — one of the names listed above (case-sensitive)
 function MatchaUI.SetFont(fontName)
     local fontMap = {
-        UI          = Drawing.Fonts.UI,
+        Matcha UI          = Drawing.Fonts.System,
         System      = Drawing.Fonts.System,
-        SystemBold  = Drawing.Fonts.SystemBold,
+        System Bold  = Drawing.Fonts.SystemBold,
+        Impact   = Drawing.Fonts.impact,
         Minecraft   = Drawing.Fonts.Minecraft,
         Monospace   = Drawing.Fonts.Monospace,
         Pixel       = Drawing.Fonts.Pixel,
+        Pixel V2       = Drawing.Fonts.vgafix,
         Fortnite    = Drawing.Fonts.Fortnite,
     }
     local font = fontMap[fontName]
     if not font then
         warn("MatchaUI.SetFont: unknown font '" .. tostring(fontName) ..
-             "'. Valid options: UI, System, SystemBold, Minecraft, Monospace, Pixel, Fortnite")
+             "'. Valid options: UI, System, SystemBold, Impact, Minecraft, Monospace, Pixel, Pixel V2, Fortnite")
         return
     end
-    _currentFont = font
-    -- Repaint all tracked Text Drawing objects
+
     for _, obj in ipairs(_textObjects) do
         pcall(function() obj.Font = font end)
     end
@@ -2492,9 +2219,8 @@ do
     end
 end
 
--- ─────────────────────────────────────────────────────────────
 -- MAIN LOOP
--- ─────────────────────────────────────────────────────────────
+
 local _sliderDrag = nil  -- currently dragged slider elem
 local _cursorBlink = 0
 local _prevHeldKeys   = {}  -- VK keys held last frame (for edge detection in text input)
@@ -2514,13 +2240,11 @@ function MatchaUI.Run()
             _mouseJustDown = mouse1 and not _lastMouse1
             _mouseJustUp   = not mouse1 and _lastMouse1
 
-            -- ── Cursor blink for focused inputs
             _cursorBlink = _cursorBlink + 0.016
             if _focusedInput and _focusedInput._cursor then
                 _focusedInput._cursor.Visible = (_cursorBlink % 1) < 0.5
             end
 
-            -- ── Notifications: tick down and shrink bar
             local i = 1
             while i <= #_notifs do
                 local n = _notifs[i]
@@ -2539,12 +2263,10 @@ function MatchaUI.Run()
                 end
             end
 
-            -- ── Tooltip handling
             for _, tip in ipairs(_tooltips) do
                 local e = tip._elem
                 if e and e._x then
-                    -- Bug fix #1: only show tooltip when the element's category is
-                    -- the active one in its window AND the window itself is visible.
+
                     local catActive = false
                     if e._cat then
                         for _, w in ipairs(_windows) do
@@ -2566,19 +2288,13 @@ function MatchaUI.Run()
                 end
             end
 
-            -- ── Per-window processing
-            -- Snapshot Choosing ONCE before any element mutates it this frame.
-            -- This prevents a dropdown close (Choosing→false) mid-loop from
-            -- accidentally allowing other elements to react on the same click.
             local _choosingThisFrame = MatchaUI.Choosing
 
             for _, win in ipairs(_windows) do
                 if not win.Visible then continue end
 
-                -- Drag window (topbar)
                 if _mouseJustDown and inBounds(mPos.X, mPos.Y,
                     win.X, win.Y, win.W, win._topBarH) then
-                    -- Check it's not a button
                     local onMin = inBounds(mPos.X, mPos.Y,
                         win._minBtnX, win._minBtnY, win._minBtnW, win._minBtnH)
                     local onClose = inBounds(mPos.X, mPos.Y,
@@ -2596,14 +2312,12 @@ function MatchaUI.Run()
                     local nx = mPos.X - win.DragOffX
                     local ny = mPos.Y - win.DragOffY
                     win.Reposition(nx, ny)
-                    -- Update stored button positions
                     win._minBtnX   = nx + win.W - 52
                     win._minBtnY   = ny + 6
                     win._closeBtnX = nx + win.W - 26
                     win._closeBtnY = ny + 6
                 end
 
-                -- Minimize / Close
                 if _mouseJustDown then
                     if inBounds(mPos.X, mPos.Y,
                         win._minBtnX, win._minBtnY, win._minBtnW, win._minBtnH) then
@@ -2617,7 +2331,6 @@ function MatchaUI.Run()
 
                 if win.Minimized then continue end
 
-                -- Category selection
                 if _mouseJustDown then
                     for _, cat in ipairs(win.Categories) do
                         if inBounds(mPos.X, mPos.Y,
@@ -2628,24 +2341,11 @@ function MatchaUI.Run()
                     end
                 end
 
-                -- Element interactions
                 for _, elem in ipairs(win._elements) do
-                    -- Only process elements belonging to the active category
                     if elem._cat ~= win.ActiveCat then continue end
-                    -- Visibility gate:
-                    -- • Normal elements: skip if their own background is hidden.
-                    -- • Elements inside a ScrollFrame (_inScrollFrame=true): their _bg
-                    --   is clipped by the frame, so we skip this check — the frame's
-                    --   own _bg being visible (guaranteed because it's a cat element) is
-                    --   sufficient. Hit-testing against elem._x/_y/_w/_h still prevents
-                    --   clicks on scrolled-out widgets.
                     if not elem._inScrollFrame then
                         if not elem._bg or not elem._bg.Visible then continue end
                     else
-                        -- BUG 1 FIX: for widgets inside a ScrollFrame, find the owning frame
-                        -- and gate all interaction on the mouse being inside the frame's
-                        -- visible bounds. Without this, elements respond to clicks even when
-                        -- they are scrolled out of view (and thus invisible).
                         local inFrame = false
                         for _, wElemWrap in ipairs(win._elements) do
                             if wElemWrap.Type == "ScrollFrame" then
@@ -2655,10 +2355,6 @@ function MatchaUI.Run()
                                         local insideFrame = inBounds(mPos.X, mPos.Y,
                                             wElemWrap._x, wElemWrap._y,
                                             wElemWrap._w - 8, wElemWrap._h)
-                                        -- COLORPICKER EXCEPTION: if the panel is open, also allow
-                                        -- clicks inside the floating panel (which lives outside the
-                                        -- frame bounds). Without this, swatches and sliders are
-                                        -- unreachable because the gate rejects them.
                                         local insidePanel = false
                                         if elem.Type == "ColorPicker" and elem._cpOpen then
                                             insidePanel = inBounds(mPos.X, mPos.Y,
@@ -2672,19 +2368,15 @@ function MatchaUI.Run()
                                 if inFrame ~= false then break end
                             end
                         end
-                        -- inFrame is false only when found but outside bounds; nil means not
-                        -- found (shouldn't happen). Either way, skip if not within frame.
                         if not inFrame then continue end
                     end
 
-                    -- BUTTON (disabled while a dropdown is open)
                     if elem.Type == "Button" and _mouseJustDown and not _choosingThisFrame then
                         if inBounds(mPos.X, mPos.Y, elem._x, elem._y, elem._w, elem._h) then
                             if elem.Callback then pcall(elem.Callback) end
                         end
                     end
 
-                    -- TOGGLE (disabled while a dropdown is open)
                     if elem.Type == "Toggle" and _mouseJustDown and not _choosingThisFrame then
                         if inBounds(mPos.X, mPos.Y, elem._tx, elem._ty, elem._trackW, elem._trackH) then
                             elem.State = not elem.State
@@ -2697,7 +2389,6 @@ function MatchaUI.Run()
                         end
                     end
 
-                    -- CHECKBOX (disabled while a dropdown is open)
                     if elem.Type == "Checkbox" and _mouseJustDown and not _choosingThisFrame then
                         if inBounds(mPos.X, mPos.Y, elem._x, elem._y, elem._w, elem._h) then
                             elem.State = not elem.State
@@ -2706,37 +2397,26 @@ function MatchaUI.Run()
                         end
                     end
 
-                    -- SLIDER drag start (disabled while a dropdown is open)
                     if elem.Type == "Slider" and _mouseJustDown and _sliderDrag == nil and not _choosingThisFrame then
-                        -- click on track or knob
                         if inBounds(mPos.X, mPos.Y, elem._trackX, elem._trackY - 6, elem._trackW, 16) then
                             _sliderDrag = elem
                         end
                     end
 
-                    -- DROPDOWN
                     if elem.Type == "Dropdown" and _mouseJustDown then
                         if inBounds(mPos.X, mPos.Y, elem._x, elem._y, elem._w, elem._h) then
-                            -- toggle open
                             elem._isOpen = not elem._isOpen
                             if elem._isOpen then
                                 MatchaUI.Choosing = true
-                                -- Recalculate item positions from the current _bg position so
-                                -- items always appear directly below the box regardless of whether
-                                -- the dropdown lives inside a ScrollFrame or was moved by dragging.
                                 local bgPos = elem._bg.Position
                                 local itemX  = bgPos.X + (elem._bg.Size.X - elem._w)  -- align to box right side
-                                -- If _boxX was stored use it, otherwise derive from _bg
                                 local bx = elem._boxX or bgPos.X
-                                -- Use _bg current X + offset to find box left edge
-                                -- The box is always 122px wide aligned to the right of _bg
                                 local boxLeft = bgPos.X + elem._bg.Size.X - elem._w
                                 local boxTop  = bgPos.Y + elem._h
                                 for _, item in ipairs(elem._itemObjs) do
                                     local iy = boxTop + (item._idx - 1) * 22
                                     item._bg.Position  = Vector2.new(boxLeft, iy)
                                     item._txt.Position = Vector2.new(boxLeft + 4, iy + 4)
-                                    -- Update hit-test coords
                                     item._x = boxLeft
                                     item._y = iy
                                     item._bg.Visible  = true
@@ -2751,7 +2431,6 @@ function MatchaUI.Run()
                             end
                             elem._arrow.Text = elem._isOpen and "^" or "v"
                         elseif elem._isOpen then
-                            -- check items
                             local hit = false
                             for _, item in ipairs(elem._itemObjs) do
                                 if inBounds(mPos.X, mPos.Y, item._x, item._y, elem._w, 22) then
@@ -2761,7 +2440,6 @@ function MatchaUI.Run()
                                     if elem.Callback then pcall(elem.Callback, item._value) end
                                 end
                             end
-                            -- close
                             elem._isOpen = false
                             MatchaUI.Choosing = false
                             elem._arrow.Text = "v"
@@ -2772,9 +2450,7 @@ function MatchaUI.Run()
                         end
                     end
 
-                    -- KEYBIND
                     if elem.Type == "Keybind" then
-                        -- Arm on mouse down; only start scanning after mouse is released
                         if _mouseJustDown and not _choosingThisFrame and inBounds(mPos.X, mPos.Y, elem._x, elem._y, elem._w, elem._h) then
                             elem._pendingListen = true
                             elem.Listening = false
@@ -2786,9 +2462,6 @@ function MatchaUI.Run()
                             elem.Listening = true
                         end
                         if elem.Listening then
-                            -- Bug fix #2: iterate only over explicitly allowed keyboard VK codes.
-                            -- This prevents mouse button releases (VK 1/2/4/5/6) and any other
-                            -- unmappable codes from ever being registered as a keybind.
                             for k, _ in pairs(VALID_KEYBIND_KEYS) do
                                 if iskeypressed(k) then
                                     elem.Key       = k
@@ -2803,17 +2476,10 @@ function MatchaUI.Run()
                         end
                     end
 
-                    -- TEXT INPUT / SEARCH BAR
-                    -- Focus is set on _mouseJustDown (for responsiveness).
-                    -- setrobloxinput(false) is deferred to _mouseJustUp so it takes effect
-                    -- AFTER the click that initiated focus is fully released — calling it
-                    -- mid-mousedown causes Matcha to ignore it for the current press.
                     if elem.Type == "TextInput" then
                         if _mouseJustDown and not _choosingThisFrame then
                             if inBounds(mPos.X, mPos.Y, elem._x, elem._y, elem._w, elem._h) then
-                                -- Clicked inside this input: focus it
                                 if _focusedInput ~= elem then
-                                    -- Blur the previously focused input first
                                     if _focusedInput then
                                         _focusedInput.Focused = false
                                         if _focusedInput._cursor then _focusedInput._cursor.Visible = false end
@@ -2822,24 +2488,19 @@ function MatchaUI.Run()
                                     elem.Focused  = true
                                     _cursorBlink  = 0
                                     if elem._inputBg then elem._inputBg.Color = Theme.InputBg end
-                                    -- setrobloxinput(false) deferred to _mouseJustUp below
                                 end
                             elseif elem == _focusedInput then
-                                -- Clicked outside a currently-focused input: blur it
                                 _focusedInput = nil
                                 elem.Focused  = false
                                 if elem._cursor then elem._cursor.Visible = false end
                                 setrobloxinput(true)
                             end
                         end
-                        -- Deferred setrobloxinput(false): fires on mouse-release of the
-                        -- click that focused this input, so Matcha honours it correctly.
                         if _mouseJustUp and elem == _focusedInput then
                             setrobloxinput(false)
                         end
                     end
 
-                    -- COLOR PICKER: header click toggles panel, palette swatch click, +/- steppers
                     if elem.Type == "ColorPicker" then
                         local function setPanelVis(state)
                             elem._panelBg.Visible     = state
@@ -2860,27 +2521,20 @@ function MatchaUI.Run()
                             elem._prevPatch.Visible = state
                         end
 
-                        -- Toggle open/close on header click
                         if _mouseJustDown and inBounds(mPos.X, mPos.Y, elem._headerX, elem._headerY, elem._headerW, elem._headerH) then
                             elem._cpOpen = not elem._cpOpen
                             elem._arrowTxt.Text = elem._cpOpen and "<" or ">"
                             if elem._cpOpen then
-                                -- Recalculate panel position from the current _bg screen position.
-                                -- This is required when the ColorPicker lives inside a ScrollFrame:
-                                -- the _bg has been shifted by AddWidget + scroll, but panelX/panelY
-                                -- were baked in at build time using the raw category cursor position.
+
                                 local bgPos  = elem._bg.Position
                                 local newPanelX = win.X + win.W + 4
                                 local newPanelY = bgPos.Y  -- vertically aligned with the header row
 
-                                -- SET panel background and border to absolute position
                                 pcall(function()
                                     elem._panelBg.Position     = Vector2.new(newPanelX, newPanelY)
                                     elem._panelBorder.Position = Vector2.new(newPanelX, newPanelY)
                                 end)
 
-                                -- Position ALL panelObjs using stored relative offsets from build time.
-                                -- This is an absolute SET — safe to call on every open without drift.
                                 local offsets = elem._panelObjOffsets or {}
                                 for i, po in ipairs(elem._panelObjs or {}) do
                                     local off = offsets[i]
@@ -2891,7 +2545,6 @@ function MatchaUI.Run()
                                     end
                                 end
 
-                                -- SET swatch hit-test coords absolutely from panel origin
                                 for _, sw in ipairs(elem._paletteSwatch or {}) do
                                     if sw._origDX then
                                         sw._x = newPanelX + sw._origDX
@@ -2899,7 +2552,6 @@ function MatchaUI.Run()
                                     end
                                 end
 
-                                -- SET channel slider hit-test coords absolutely
                                 local cs = elem._channelSliders or {}
                                 for _, s in pairs(cs) do
                                     if s._origTrackDX then s._trackX = newPanelX + s._origTrackDX end
@@ -2907,7 +2559,6 @@ function MatchaUI.Run()
                                     if s._origRowDY   then s._rowY   = newPanelY + s._origRowDY   end
                                 end
 
-                                -- SET btnObjs hit-test coords absolutely
                                 for _, btn in ipairs(elem._btnObjs or {}) do
                                     if btn._origDX       then btn._x      = newPanelX + btn._origDX      end
                                     if btn._origDY       then btn._y      = newPanelY + btn._origDY      end
@@ -2915,7 +2566,6 @@ function MatchaUI.Run()
                                     if btn._origKnobDY   then btn._knobY  = newPanelY + btn._origKnobDY  end
                                 end
 
-                                -- Update stored panel position for inBounds checks
                                 elem._panelX = newPanelX
                                 elem._panelY = newPanelY
 
@@ -2926,7 +2576,6 @@ function MatchaUI.Run()
                         end
 
                         if elem._cpOpen then
-                            -- Close panel if click is outside both header and panel
                             if _mouseJustDown then
                                 local inHeader = inBounds(mPos.X, mPos.Y, elem._headerX, elem._headerY, elem._headerW, elem._headerH)
                                 local inPanel  = inBounds(mPos.X, mPos.Y, elem._panelX, elem._panelY, elem._panelW, elem._panelH)
@@ -2937,7 +2586,6 @@ function MatchaUI.Run()
                                 end
                             end
 
-                            -- Palette swatch click
                             if _mouseJustDown then
                                 for _, sw in ipairs(elem._paletteSwatch or {}) do
                                     if inBounds(mPos.X, mPos.Y, sw._x, sw._y, sw._w, sw._h) then
@@ -2948,7 +2596,6 @@ function MatchaUI.Run()
                                 end
                             end
 
-                            -- RGB channel sliders: start drag on mousedown, update on hold
                             if _mouseJustDown and elem._cpDragCh == nil then
                                 for _, btn in ipairs(elem._btnObjs or {}) do
                                     if btn._isSlider and inBounds(mPos.X, mPos.Y, btn._x, btn._y, btn._w, btn._h) then
@@ -2959,7 +2606,6 @@ function MatchaUI.Run()
                                 end
                             end
 
-                            -- Update dragged channel slider every frame while mouse held
                             if elem._cpDragCh and mouse1 then
                                 local btn2 = elem._cpDragBtn
                                 local relX = math.max(0, math.min(mPos.X - btn2._trackX, btn2._trackW))
@@ -2981,9 +2627,7 @@ function MatchaUI.Run()
                         end
                     end
 
-                    -- SCROLL FRAME: content drag (anywhere in frame) + scrollbar thumb drag
                     if elem.Type == "ScrollFrame" then
-                        -- Always derive sbX from elem._sbX (kept in sync by reposition)
                         local sbX = elem._sbX
                         local sbW = 8   -- wider hit zone for the scrollbar (matches the track visual)
 
@@ -3352,5 +2996,26 @@ function MatchaUI.Destroy()
     _notifs   = {}
     _tooltips = {}
 end
+
+--  FPS counter
+
+spawn(function()
+    local lastTime = tick()
+    local frames   = 0   -- frames counted in the current second
+    local total    = 0   -- total frames since script start
+    while true do
+        wait(0.016)
+        frames = frames + 1
+        total  = total  + 1
+        local now = tick()
+        if now - lastTime >= 1 then
+            vlFps:SetValue(frames .. " fps")
+            vlFrames:SetValue(tostring(total))
+            frames   = 0
+            lastTime = now
+        end
+    end
+end)
+
 
 return MatchaUI
