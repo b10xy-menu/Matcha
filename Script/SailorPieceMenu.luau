@@ -881,49 +881,5 @@ local excludeBossDd = Window.AddDropdown(catFarm, "Exclude / Include Boss", farm
 end)
 Window.AddTooltip(excludeBossDd, "Select bosses you want to ignore")
 
-spawn(function()
-    local lastTime = tick()
-    local frames   = 0   -- frames counted in the current second
-    local total    = 0   -- total frames since script start
-    while true do
-        wait(0.016)
-        frames = frames + 1
-        total  = total  + 1
-        local now = tick()
-        if now - lastTime >= 1 then
-            vlFps:SetValue(frames .. " fps")
-            vlFrames:SetValue(tostring(total))
-            frames   = 0
-            lastTime = now
-        end
-    end
-end)
-
-    base = Drawing.new("Square")
-    base.Size = Vector2.new(100, 50)
-    base.Position = Vector2.new(50, 100)
-    base.Filled = true
-    base.Color = Color3.fromRGB(15, 15, 15)
-    base.Visible = true
-    base.Corner = 7
-
-    local text = Drawing.new("Text")
-    text.Position = Vector2.new(60, 118)
-    text.Text = "test"
-    text.Color = Color3.fromRGB(255, 255, 255)
-    
-
-
-while true do
-
-    local pingAddress = game:FindFirstChild("Stats"):FindFirstChild("PerformanceStats"):FindFirstChild("Ping").Address
-    local ping = memory_read("double", pingAddress + 0xC8)
-
-    text.Text = "Ping: " .. math.floor(ping)
-
-    print(ping)
-    wait(1)
-end
-
 Window.AddConfigPreset({})
 UiLib.Run()
