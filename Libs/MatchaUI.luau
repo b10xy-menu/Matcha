@@ -3354,26 +3354,3 @@ function MatchaUI.Destroy()
 end
 
 return MatchaUI
-
---  FPS counter
-
-spawn(function()
-    local lastTime = tick()
-    local frames   = 0   -- frames counted in the current second
-    local total    = 0   -- total frames since script start
-    while true do
-        wait(0.016)
-        frames = frames + 1
-        total  = total  + 1
-        local now = tick()
-        if now - lastTime >= 1 then
-            vlFps:SetValue(frames .. " fps")
-            vlFrames:SetValue(tostring(total))
-            frames   = 0
-            lastTime = now
-        end
-    end
-end)
-
-
-return MatchaUI
