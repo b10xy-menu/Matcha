@@ -1,7 +1,6 @@
 
 -- Sailor Piece, by Saint_B10X
 
--- Loader
 local loaderSource = game:HttpGet("https://raw.githubusercontent.com/b10xy-menu/Matcha/refs/heads/main/Libs/Loader.luau")
 local fn, loaderErr = loadstring("MatchaLib = (function()\n" .. loaderSource .. "\nend)()")
 if not fn then error("COMPILE ERROR (Loader): " .. tostring(loaderErr)) end
@@ -9,7 +8,6 @@ fn()
 local Loader = MatchaLib
 local UiLib = Loader.load("MatchaUI")
 
--- Keycodes
 local keyMap = {
 	A = 65, B = 66, C = 67, D = 68, E = 69, F = 70,
 	G = 71, H = 72, I = 73, J = 74, K = 75, L = 76,
@@ -26,10 +24,14 @@ local keyMap = {
 local cons = {
 	Workspace = game:GetService("Workspace"),
 	Players = game:GetService("Players"),
-	RunService = game:GetService("RunService")
+	RunService = game:GetService("RunService"),
+	Seas = {
+		Sea1 = 77747658251236,
+		Sea2 = 00000000000001, -- not support for now
+	},
 }
 cons.Player = cons.Players.LocalPlayer
-cons.Backpack = cons.Player:WaitForChild("Backpack")
+cons.PlayerGui = cons.Player:WaitForChild("PlayerGui")
 cons.NPCPath = cons.Workspace:WaitForChild("NPCs")
 
 local farmCfg = {
@@ -38,7 +40,9 @@ local farmCfg = {
 	CachedToolNumber = nil,
 
 	AutofarmMethod = "Nearest",
+	AttackPosition = "Upward",
 	SelectedQuest = "",
+	NPCKillNumber = nil,
 	SelectedNPCs = {},
 	SelectedAttacks = {},
 
@@ -66,20 +70,43 @@ local farmCfg = {
 		Quest14 = {"QuestNPC14", Vector3.new(-1187.4, 17.9, 338.5), "Slime", {8000,9000}},
 		Quest15 = {"QuestNPC15", Vector3.new(1028, 1.4, 1241), "AcademyTeacher", {9000,10000}},
 		Quest16 = {"QuestNPC16", Vector3.new(-1165, 2.5, -1189.8), "Swordsman", {10000,10750}},
-		Quest17 = {"QuestNPC17", Vector3.new(0, 0, 0), "Unknown", {10750,11500}},
+		Quest17 = {"QuestNPC17", Vector3.new(-1408, 1603, 1642.2), "Quincy", {10750,11500}},
 		Quest18 = {"QuestNPC18", Vector3.new(-1786.6, 7, -744.6), "Ninja", {11500,12000}},
 		Quest19 = {"QuestNPC19", Vector3.new(67, -1.1, 1758.8), "ArenaFighter", {12000,12750}},
 	},
-	QuestsNames = {}
-}; for i = 1, 19 do table.insert(farmCfg.QuestsNames, "Quest" .. i) end
+	QuestsNames = {},
+	BossesMap = {
+		-- Timed bosses
+		Boss1 = {"JinwooBoss", Vector3.new(250, 50, 930)},
+		Boss2 = {"AlucardBoss", Vector3.new(250, 50, 930)},
+		Boss3 = {"GojoBoss", Vector3.new(1858, 50, 338.14)},
+		Boss4 = {"YujiBoss", Vector3.new(1537, 50, 226.11)},
+		Boss5 = {"SukunaBoss", Vector3.new(1571, 150, -34)},
+		Boss6 = {"AizenBoss", Vector3.new(-567, 50, 1228)},
+		Boss7 = {"StrongestShinobiBoss", Vector3.new(-2110.6, 50, -595)},
+		Boss8 = {"YamatoBoss", Vector3.new(-1422, 50, -1383)},
+	},
+	bossNames = {},
+	ExcludedBosses = {},
+};
+for questKey in farmCfg.QuestMap do table.insert(farmCfg.QuestsNames, questKey) end
+
+table.sort(farmCfg.QuestsNames, function(a, b)
+	local numA = tonumber(string.match(a, "%d+")) or 0
+	local numB = tonumber(string.match(b, "%d+")) or 0
+	return numA < numB
+end)
+
+for _, data in farmCfg.BossesMap do table.insert(farmCfg.bossNames, data[1]) end
+table.sort(farmCfg.bossNames)
 
 local farmToggles = {
 	attacking = false,
 	farming = false,
 	equipTools = false,
+	bossPrioritize = false
 }
 
--- Helpers
 local function getRoot(Model)
 	if not Model.ClassName == "Model" then return "Class missmatch" end
 	local Root = Model:FindFirstChild("HumanoidRootPart")
@@ -96,11 +123,10 @@ local function getHumanoid(Model)
 	return Humanoid
 end
 
--- Tool Utilities
 local function refreshTools()
 	table.clear(farmCfg.Tools)
 	table.insert(farmCfg.Tools, "None")
-	for _, tool in cons.Backpack:GetChildren() do
+	for _, tool in cons.Player.Backpack:GetChildren() do
 		if tool.ClassName == "Tool" then
 			table.insert(farmCfg.Tools, tool.Name)
 		end
@@ -135,9 +161,7 @@ local function equipTool(toolName)
 		keyrelease(KeyCode)
 		task.wait(0.1)
 		toolEquipped = cons.Player.Character:FindFirstChild(toolName)
-		if toolEquipped and toolEquipped.ClassName == "Tool" then
-			return
-		end
+		if toolEquipped and toolEquipped.ClassName == "Tool" then return end
 	end
 
 	for slot, keyCode in inventorySlots do
@@ -153,7 +177,6 @@ local function equipTool(toolName)
 	return "Tool not found"
 end
 
--- NPCs Utilities
 local function refreshNPCs()
 	table.clear(farmCfg.SelectedNPCs)
 	table.clear(farmCfg.ExistingNPCs)
@@ -204,6 +227,8 @@ local function findNearestNPC(filterNames)
 
 	for _, npc in cons.NPCPath:GetChildren() do
 		if npc.ClassName == "Model" and npc:FindFirstChild("HumanoidRootPart") and npc.Name ~= "TrainingDummy" then
+			if table.find(farmCfg.ExcludedBosses, npc.Name) then continue end
+			
 			local humanoid = getHumanoid(npc)
 			if humanoid and humanoid.Health > 0 then
 				local nameFormatted = npc.Name:gsub("%s*%d+$", "")
@@ -232,6 +257,8 @@ local function findNearestNPC(filterNames)
 			end
 
 			for _, exactName in possibleNames do
+				if table.find(farmCfg.ExcludedBosses, exactName) then continue end
+				
 				local directNpc = cons.NPCPath:FindFirstChild(exactName)
 				if directNpc and directNpc.ClassName == "Model" and directNpc:FindFirstChild("HumanoidRootPart") then
 					local humanoid = getHumanoid(directNpc)
@@ -250,7 +277,68 @@ local function findNearestNPC(filterNames)
 	return nearestNPC
 end
 
--- Utilities 
+local function findNearestBoss(filterNamesExclusion)
+	local character = cons.Player.Character
+	local root = getRoot(character)
+
+	if not root then return nil, nil end
+
+	local nearestBoss = nil
+	local nearestPos = nil
+	local bestDist = math.huge
+
+	local function isExcluded(npcName)
+		if not filterNamesExclusion then return false end
+		return table.find(filterNamesExclusion, npcName) ~= nil
+	end
+
+	for _, npc in cons.NPCPath:GetChildren() do
+		if npc.ClassName == "Model" and (npc:GetAttribute("_IsTimedBoss") or npc:GetAttribute("_IsStrongestBoss")) then
+			if not isExcluded(npc.Name) then
+				local humanoid = getHumanoid(npc)
+				if humanoid and humanoid.Health > 0 then
+					local npcRoot = getRoot(npc)
+					if npcRoot then
+						local dist = (npcRoot.Position - root.Position).Magnitude
+						if dist < bestDist then
+							bestDist = dist
+							nearestBoss = npc
+							nearestPos = npcRoot.Position
+						end
+					end
+				end
+			end
+		end
+	end	
+
+	if not nearestBoss then
+		for _, bossData in farmCfg.BossesMap do
+			local exactName = bossData[1]
+			local spawnPos = bossData[2]
+
+			if not isExcluded(exactName) then
+				local npc = cons.NPCPath:FindFirstChild(exactName)
+				if npc and npc.ClassName == "Model" then
+					local humanoid = getHumanoid(npc)
+					if humanoid and humanoid.Health > 0 then
+						local npcRoot = getRoot(npc)
+						local targetPos = npcRoot and (npcRoot.Position + Vector3.new(0, 20, 0)) or spawnPos
+						
+						local dist = (targetPos - root.Position).Magnitude
+						if dist < bestDist then
+							bestDist = dist
+							nearestBoss = npc
+							nearestPos = targetPos
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	return nearestBoss, nearestPos
+end
+
 local tweenToken = 0
 local function TweenTo(targetPos, lift)
 	tweenToken += 1
@@ -260,15 +348,6 @@ local function TweenTo(targetPos, lift)
 	if not character then return end
 	local root = getRoot(character)
 	if not root then return end
-
-	if farmCfg.SafeTween and lift then
-		root.Velocity = Vector3.new(0, 300, 0)
-		root.Velocity = Vector3.new(0, 300, 0)
-		root.Velocity = Vector3.new(0, 300, 0)
-		root.Velocity = Vector3.new(0, 300, 0)
-		task.wait(0.75)
-		if tweenToken ~= myToken then return end
-	end
 
 	local startPos = root.Position
 	local distance = (targetPos - startPos).Magnitude
@@ -375,7 +454,23 @@ local function getNearestSpawnpoint()
 	return nearestSpawnpoint
 end
 
--- Auto Farm Logic 
+local function getQuestStatus(text)
+	local current, max = string.match(text, "(%d+)/(%d+)")
+	if current and max then
+		return tonumber(current), tonumber(max)
+	else
+		return nil, nil
+	end
+end
+
+local function readQuestStatus()
+	local ok, text = pcall(function()
+		return cons.PlayerGui.QuestUI.Quest.Quest.Holder.Content.QuestInfo.QuestRequirement.Text
+	end)
+	if not ok then return nil, nil end
+	return getQuestStatus(text)
+end
+
 local function getSpawnpointAddress(spawnpoint)
 	if not spawnpoint then return nil end
 	return tostring(spawnpoint.Address)
@@ -399,9 +494,10 @@ local function handleSpawnpoint()
 	TweenTo(spawnRoot.Position + Vector3.new(0,5,0), true)
 
 	keypress(keyMap.E)
-	for i = 1,30 do
-		root.Position = spawnRoot.Position
-		task.wait(0.1)
+	for i = 1,60 do
+		root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		root.Position = spawnRoot.Position + Vector3.new(0, 5, 0)
+		task.wait(0.05)
 	end
 	keyrelease(keyMap.E)
 
@@ -409,9 +505,15 @@ local function handleSpawnpoint()
 	return true
 end
 
--- Farm Utilities 
 local function attackNPC(npc)
 	if not farmToggles.farming then return end
+
+	local npcRoot = getRoot(npc)
+	if not npcRoot then return end
+	
+	local lastPosUpdate = 0 
+	local updateInterval = 3
+	local targetPosition = npcRoot.Position
 
 	while farmToggles.farming do
 		local character = cons.Player.Character
@@ -422,21 +524,30 @@ local function attackNPC(npc)
 
 		if not playerHumanoid or playerHumanoid.Health <= 0 then break end
 		if not npcHumanoid or npcHumanoid.Health <= 0 then break end
-
-		local npcRoot = getRoot(npc)
 		if not npcRoot then break end
 
+		if farmCfg.AttackPosition == "Backward" or farmCfg.AttackPosition == "Front" or os.clock() - lastPosUpdate >= updateInterval then
+			local dist = farmCfg.NPCDistance
+			
+			if farmCfg.AttackPosition == "Bottom" then
+				targetPosition = (npcRoot.CFrame * CFrame.new(0, -dist, 0)).Position
+			elseif farmCfg.AttackPosition == "Backward" then
+				targetPosition = (npcRoot.CFrame * CFrame.new(0, 0, dist)).Position
+			elseif farmCfg.AttackPosition == "Front" then
+				targetPosition = (npcRoot.CFrame * CFrame.new(0, 0, -dist)).Position
+			else
+				targetPosition = (npcRoot.CFrame * CFrame.new(0, dist, 0)).Position
+			end
+			
+			lastPosUpdate = os.clock()
+		end
+
 		local root = getRoot(character)
-		local overPos = npcRoot.Position + Vector3.new(0, farmCfg.NPCDistance, 0)
 
 		if root then
-			root.CFrame = CFrame.new(
-				overPos.X, overPos.Y, overPos.Z,
-				1, 0, 0,
-				0, 0, 1,
-				0, -1, 0
-			)
-			root.Velocity = Vector3.new(0, 0, 0)
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			root.CFrame = CFrame.lookAt(targetPosition, npcRoot.Position)
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 		end
 
 		task.wait()
@@ -445,41 +556,77 @@ end
 
 local function runFarmNearest(filtered)
 	while farmToggles.farming do
-		local filter = (filtered and #farmCfg.SelectedNPCs > 0) and farmCfg.SelectedNPCs or nil
-		local npc = findNearestNPC(filter)
+		local targetNPC = nil
+		local targetPos = nil
+		
+		if farmToggles.bossPrioritize then
+			targetNPC, targetPos = findNearestBoss(farmCfg.ExcludedBosses)
+		end
+		
+		if not targetNPC then
+			local filter = (filtered and #farmCfg.SelectedNPCs > 0) and farmCfg.SelectedNPCs or nil
+			targetNPC = findNearestNPC(filter)
+			
+			if targetNPC then
+				local npcRoot = getRoot(targetNPC)
+				if npcRoot then
+					targetPos = npcRoot.Position
+				end
+			end
+		end
 
-		if not npc then
+		if not targetNPC or not targetPos then
 			task.wait(1)
 			continue
 		end
 
-		local npcRoot = getRoot(npc)
-		if npcRoot then
-			TweenTo(npcRoot.Position + Vector3.new(0, 50, 0), true)
-		end
+		TweenTo(targetPos + Vector3.new(0, 50, 0), true)
 		if not farmToggles.farming then break end
 
 		local spawnChanged = handleSpawnpoint()
 		if not farmToggles.farming then break end
 
-		if spawnChanged and npcRoot then
-			TweenTo(npcRoot.Position + Vector3.new(0, 50, 0), true)
+		if spawnChanged then
+			TweenTo(targetPos + Vector3.new(0, 50, 0), true)
 		end
 		if not farmToggles.farming then break end
 
-		attackNPC(npc)
+		attackNPC(targetNPC)
 		task.wait(0.1)
 	end
 end
 
 local function runFarmQuest(autoLevel)
+	local forceGoToNPC = true 
+
 	while farmToggles.farming do
-		local questKey
-		if autoLevel then
-			questKey = selectQuestForLevel()
-		else
-			questKey = farmCfg.SelectedQuest
+		local targetBoss = nil
+		local targetPos = nil
+		
+		if farmToggles.bossPrioritize then
+			targetBoss, targetPos = findNearestBoss(farmCfg.ExcludedBosses)
 		end
+
+		if targetBoss and targetPos then
+			TweenTo(targetPos + Vector3.new(0, 50, 0), true)
+			if not farmToggles.farming then break end
+
+			local spawnChanged = handleSpawnpoint()
+			if spawnChanged then
+				TweenTo(targetPos + Vector3.new(0, 50, 0), true)
+			end
+
+			local bossRoot = getRoot(targetBoss)
+			if bossRoot then
+				attackNPC(targetBoss)
+			end
+			
+			forceGoToNPC = true
+			task.wait(0.1)
+			continue
+		end
+
+		local questKey = autoLevel and selectQuestForLevel() or farmCfg.SelectedQuest
 
 		if not questKey or not farmCfg.QuestMap[questKey] then
 			task.wait(1)
@@ -490,22 +637,31 @@ local function runFarmQuest(autoLevel)
 		local questPos = questData[2]
 		local enemyName = questData[3]
 
-		TweenTo(questPos, true)
-		if not farmToggles.farming then break end
+		local currentProgress, maxProgress = readQuestStatus()
 
-		local spawnChanged = handleSpawnpoint()
-		if not farmToggles.farming then break end
-
-		if spawnChanged then
+		if forceGoToNPC or currentProgress == nil then
 			TweenTo(questPos, true)
 			if not farmToggles.farming then break end
-		end
 
-		for i = 1, 5 do
-			keypress(keyMap.E)
-			keyrelease(keyMap.E)
+			local spawnChanged = handleSpawnpoint()
+			if not farmToggles.farming then break end
+
+			if spawnChanged then
+				TweenTo(questPos, true)
+				if not farmToggles.farming then break end
+			end
+
+			for i = 1, 5 do
+				keypress(keyMap.E)
+				keyrelease(keyMap.E)
+				task.wait(0.1)
+			end
+
+			task.wait(0.5) 
+			currentProgress, maxProgress = readQuestStatus()
+
+			forceGoToNPC = false 
 		end
-		task.wait(0.2)
 
 		local npc = findNearestNPC({enemyName})
 		if not npc then
@@ -519,7 +675,24 @@ local function runFarmQuest(autoLevel)
 		end
 		if not farmToggles.farming then break end
 
+		local progressBeforeKill = currentProgress or 0
+
 		attackNPC(npc)
+
+		local npcHumanoid = getHumanoid(npc)
+		if npcHumanoid and npcHumanoid.Health <= 0 then
+			task.wait(0.3) 
+
+			local newProgress, newMax = readQuestStatus()
+
+			if newProgress == progressBeforeKill then
+				forceGoToNPC = true
+			else
+				forceGoToNPC = false
+				currentProgress = newProgress
+			end
+		end
+
 		task.wait(0.1)
 	end
 end
@@ -547,30 +720,26 @@ local function startAutoFarm(state)
 	end)
 end
 
--- UI INIT
 local Window = UiLib.CreateWindow({
-	Title  = "Sailor Piece Menu v1.0.0 - B10X",
-	X      = 510,
-	Y      = 110,
-	Width  = 615,
-	Height = 615,
-	ZIndex = 110,
+	Title  = "Sailor Piece Menu v1.0.1 - B10X",
+	X      = 515,
+	Y      = 120,
+	Width  = 625,
+	Height = 625,
+	ZIndex = 120,
 })
 
--- Categories 
 local catSetup = Window.AddCategory("Auto Farm Settings")
 local catFarm = Window.AddCategory("Auto Farm")
 
--- Setup Category
-
--- Tools section
 Window.AddSection(catSetup, "Tools")
 local toolsDd = Window.AddDropdown(catSetup, "Tool select", farmCfg.Tools, "None", function(sel)
 	task.spawn(function()
 		farmCfg.SelectedTool = sel
 	end)
 end)
-Window.AddTooltip(toolsDd, "Select tool for autofarming")
+Window.AddTooltip(toolsDd, "Select a tool for autofarming")
+
 
 local attackLabel = Window.AddValueLabel(catSetup, "Selected attacks", "None")
 local attacksDd = Window.AddDropdown(catSetup, "Select attacks", {"Z", "X", "C", "V", "F"}, "None", function(sel)
@@ -584,7 +753,7 @@ local attacksDd = Window.AddDropdown(catSetup, "Select attacks", {"Z", "X", "C",
 		attackLabel:SetValue(table.concat(farmCfg.SelectedAttacks, ", "))
 	end)
 end)
-Window.AddTooltip(attacksDd, "Select auto-attacks for autofarm")
+Window.AddTooltip(attacksDd, "Select auto-attacks for the autofarm")
 
 local toolUpdtateBtn = Window.AddButton(catSetup, "Refresh tools", function()
 	refreshTools()
@@ -592,9 +761,8 @@ local toolUpdtateBtn = Window.AddButton(catSetup, "Refresh tools", function()
 	toolsDd:SetOptions(farmCfg.Tools, "None")
 	UiLib.Notify("Tool update", "List of tools updated", 2)
 end)
-Window.AddTooltip(toolUpdtateBtn, "Update the list of tools.")
+Window.AddTooltip(toolUpdtateBtn, "Update the list of tools")
 
--- NPCs Section 
 Window.AddSection(catSetup, "NPCs")
 local NPCsLabel = Window.AddValueLabel(catSetup, "Selected NPCs", "None")
 local NPCsDd = Window.AddDropdown(catSetup, "Select NPCs", farmCfg.ExistingNPCs, "None", function(sel)
@@ -615,36 +783,45 @@ local NPCsUpdateBtn = Window.AddButton(catSetup, "Refresh NPCs", function()
 	NPCsDd:SetOptions(farmCfg.ExistingNPCs, "None")
 	NPCsLabel:SetValue(table.concat(farmCfg.SelectedNPCs, ", "))
 end)
-Window.AddTooltip(NPCsUpdateBtn, "Update the list of NPCs.")
+Window.AddTooltip(NPCsUpdateBtn, "Update the list of NPCs")
 
-Window.AddToggle(catSetup, "Safe tween", farmCfg.SafeTween, function(state)
+local safeTweenTgl = Window.AddToggle(catSetup, "Safe tween", farmCfg.SafeTween, function(state)
 	farmCfg.SafeTween = state
 end)
+Window.AddTooltip(safeTweenTgl, "This Tween will use dash movement")
+
 Window.AddSlider(catSetup, "Tween Speed", 16, 200, farmCfg.TweenSpeed, function(val)
 	farmCfg.TweenSpeed = math.floor(val)
 end)
+
+local attackPosDd = Window.AddDropdown(catSetup, "Attack Position", {"Upward", "Bottom", "Backward", "Front"}, farmCfg.AttackPosition, function(sel)
+	task.spawn(function()
+		farmCfg.AttackPosition = sel
+	end)
+end)
+Window.AddTooltip(attackPosDd, "Select attack position | Note: If using Bottom, enable Noclip in the Matcha menu")
+
 Window.AddSlider(catSetup, "NPC Distance", 1, 20, farmCfg.NPCDistance, function(val)
 	farmCfg.NPCDistance = math.floor(val)
 end)
 
--- Farm Section 
-Window.AddSection(catSetup, "Farm")
+Window.AddSection(catFarm, "Farm config")
 
-local farmMethodDd = Window.AddDropdown(catSetup, "Farm method", {"Nearest", "Selected", "Quest", "LevelUp"}, farmCfg.AutofarmMethod, function(sel)
+local farmMethodDd = Window.AddDropdown(catFarm, "Farm method", {"Nearest", "Selected", "Quest", "LevelUp"}, farmCfg.AutofarmMethod, function(sel)
 	task.spawn(function()
 		farmCfg.AutofarmMethod = sel
 	end)
 end)
 Window.AddTooltip(farmMethodDd, "Select the auto farm method")
 
-local selectQuestDd = Window.AddDropdown(catSetup, "Quest (for Quest method)", farmCfg.QuestsNames, "None", function(sel)
+local selectQuestDd = Window.AddDropdown(catFarm, "Quest (for Quest method)", farmCfg.QuestsNames, "None", function(sel)
 	task.spawn(function()
 		farmCfg.SelectedQuest = sel
-		TweenTo(farmCfg.QuestMap[sel][2], true)
+		--TweenTo(farmCfg.QuestMap[sel][2], true)
 	end)
 end)
 
--- Farm Category 
+Window.AddSection(catFarm, "Auto Farming")
 Window.AddToggle(catFarm, "Auto Farm", farmToggles.farming, function(state)
 	task.spawn(function()
 		startAutoFarm(state)
@@ -661,7 +838,7 @@ Window.AddToggle(catFarm, "Attack", farmToggles.attacking, function(state)
 	end)
 end)
 
-Window.AddToggle(catFarm, "Auto equip tools", farmToggles.equipTools, function(state)
+local AutoEquipTgl = Window.AddToggle(catFarm, "Auto equip tools", farmToggles.equipTools, function(state)
 	task.spawn(function()
 		farmToggles.equipTools = state
 		while farmToggles.equipTools do
@@ -675,6 +852,78 @@ Window.AddToggle(catFarm, "Auto equip tools", farmToggles.equipTools, function(s
 		end
 	end)
 end)
+Window.AddTooltip(AutoEquipTgl, "Auto-Equip choosen tool in Farm Setup")
+
+Window.AddSection(catFarm, "Bosses")
+
+local PrioBossCbx = Window.AddCheckbox(catFarm, "Prioritize bosses", farmToggles.bossPrioritize, function(state)
+	farmToggles.bossPrioritize = state
+end)
+Window.AddTooltip(PrioBossCbx, "Check if there are bosses to kill")
+
+local excludedBossesLabel = Window.AddValueLabel(catFarm, "Excluded Bosses", "None")
+local excludeBossDd = Window.AddDropdown(catFarm, "Exclude / Include Boss", farmCfg.bossNames, "None", function(sel)
+	task.spawn(function()
+		if sel == "None" then return end 
+		local index = table.find(farmCfg.ExcludedBosses, sel)
+		if index then
+			table.remove(farmCfg.ExcludedBosses, index)
+		else
+			table.insert(farmCfg.ExcludedBosses, sel)
+		end
+
+		if #farmCfg.ExcludedBosses > 0 then
+			excludedBossesLabel:SetValue(table.concat(farmCfg.ExcludedBosses, ", "))
+		else
+			excludedBossesLabel:SetValue("None")
+		end
+	end)
+end)
+Window.AddTooltip(excludeBossDd, "Select bosses you want to ignore")
+
+spawn(function()
+    local lastTime = tick()
+    local frames   = 0   -- frames counted in the current second
+    local total    = 0   -- total frames since script start
+    while true do
+        wait(0.016)
+        frames = frames + 1
+        total  = total  + 1
+        local now = tick()
+        if now - lastTime >= 1 then
+            vlFps:SetValue(frames .. " fps")
+            vlFrames:SetValue(tostring(total))
+            frames   = 0
+            lastTime = now
+        end
+    end
+end)
+
+    base = Drawing.new("Square")
+    base.Size = Vector2.new(100, 50)
+    base.Position = Vector2.new(50, 100)
+    base.Filled = true
+    base.Color = Color3.fromRGB(15, 15, 15)
+    base.Visible = true
+    base.Corner = 7
+
+    local text = Drawing.new("Text")
+    text.Position = Vector2.new(60, 118)
+    text.Text = "test"
+    text.Color = Color3.fromRGB(255, 255, 255)
+    
+
+
+while true do
+
+    local pingAddress = game:FindFirstChild("Stats"):FindFirstChild("PerformanceStats"):FindFirstChild("Ping").Address
+    local ping = memory_read("double", pingAddress + 0xC8)
+
+    text.Text = "Ping: " .. math.floor(ping)
+
+    print(ping)
+    wait(1)
+end
 
 Window.AddConfigPreset({})
 UiLib.Run()
